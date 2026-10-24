@@ -77,33 +77,6 @@ export default function Login() {
           </button>
         </div>
 
-        {/* Cute Feature Cards List */}
-        <div
-          style={{
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '10px',
-            textAlign: 'left',
-            padding: '16px',
-            background: 'var(--color-glass-card-inner)',
-            borderRadius: 'var(--radius-lg)',
-            border: '1px solid var(--color-glass-border)',
-          }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.88rem' }}>
-            <span style={{ fontSize: '1.2rem' }}>🎮</span>
-            <span><strong>3 intimate games:</strong> This or That, Know Me, Truth or Dare</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.88rem' }}>
-            <span style={{ fontSize: '1.2rem' }}>🔒</span>
-            <span><strong>Simultaneous reveal:</strong> Answers unlock only when both are submitted</span>
-          </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.88rem' }}>
-            <span style={{ fontSize: '1.2rem' }}>💌</span>
-            <span><strong>Romantic letter:</strong> Personalised reward after all games</span>
-          </div>
-        </div>
-
         {/* Small Trust Note */}
         <p style={{ marginTop: '20px', fontSize: '0.78rem', color: 'var(--color-warm-brown-light)' }}>
           18+ couples only • Private sessions • No permanent chat stored

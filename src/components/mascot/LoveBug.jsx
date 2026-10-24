@@ -4,6 +4,7 @@ import React from 'react';
  * LoveBug Mascot Component
  * Pure SVG Mascot with heart antennae, little wings, blush cheeks, and mood expressions.
  * Moods: 'happy' (default), 'sleepy' (waiting), 'sad' (errors), 'love' (excited)
+ * Features lively SVG sub-animations: fluttering heart antennae, fluttering wings, and twinkling stars!
  */
 export default function LoveBug({ mood = 'happy', size = 110, className = '' }) {
   return (
@@ -48,35 +49,41 @@ export default function LoveBug({ mood = 'happy', size = 110, className = '' }) 
 
           {/* Soft Shadow */}
           <filter id="softBugShadow" x="-20%" y="-20%" width="140%" height="140%">
-            <feDropShadow dx="0" dy="6" stdDeviation="5" floodColor="#D985A3" floodOpacity="0.3" />
+            <feDropShadow dx="0" dy="6" stdDeviation="5" floodColor="#D985A3" floodOpacity="0.32" />
           </filter>
         </defs>
 
-        {/* Cute Tiny Translucent Wings */}
-        <g opacity="0.65">
+        {/* Cute Tiny Translucent Wings with flutter */}
+        <g opacity="0.7">
           <ellipse
             cx="32"
             cy="52"
             rx="16"
             ry="9"
-            transform="rotate(-30 32 52)"
             fill="#FFFFFF"
             stroke="#F8C9D8"
             strokeWidth="1.5"
+            style={{
+              transformOrigin: '38px 55px',
+              animation: 'wingFlutterLeft 2s ease-in-out infinite',
+            }}
           />
           <ellipse
             cx="88"
             cy="52"
             rx="16"
             ry="9"
-            transform="rotate(30 88 52)"
             fill="#FFFFFF"
             stroke="#F8C9D8"
             strokeWidth="1.5"
+            style={{
+              transformOrigin: '82px 55px',
+              animation: 'wingFlutterRight 2s ease-in-out infinite',
+            }}
           />
         </g>
 
-        {/* Left Antenna with Heart */}
+        {/* Left Antenna Stalk */}
         <path
           d="M48 42 C 44 26, 32 20, 28 22"
           stroke="#C26383"
@@ -84,14 +91,20 @@ export default function LoveBug({ mood = 'happy', size = 110, className = '' }) 
           strokeLinecap="round"
           fill="none"
         />
-        {/* Left Heart Tip */}
-        <path
-          d="M 28 22 C 26 18, 20 18, 19 23 C 18 28, 25 32, 28 34 C 31 32, 38 28, 37 23 C 36 18, 30 18, 28 22 Z"
-          fill="url(#antennaGrad)"
-          transform="translate(-6, -8) scale(0.7) rotate(-15 28 22)"
-        />
+        {/* Left Heart Tip with Flutter */}
+        <g
+          style={{
+            transformOrigin: '28px 22px',
+            animation: 'antennaFlutterLeft 2.4s ease-in-out infinite',
+          }}
+        >
+          <path
+            d="M 28 22 C 26 18, 20 18, 19 23 C 18 28, 25 32, 28 34 C 31 32, 38 28, 37 23 C 36 18, 30 18, 28 22 Z"
+            fill="url(#antennaGrad)"
+          />
+        </g>
 
-        {/* Right Antenna with Heart */}
+        {/* Right Antenna Stalk */}
         <path
           d="M72 42 C 76 26, 88 20, 92 22"
           stroke="#C26383"
@@ -99,12 +112,18 @@ export default function LoveBug({ mood = 'happy', size = 110, className = '' }) 
           strokeLinecap="round"
           fill="none"
         />
-        {/* Right Heart Tip */}
-        <path
-          d="M 92 22 C 90 18, 84 18, 83 23 C 82 28, 89 32, 92 34 C 95 32, 102 28, 101 23 C 100 18, 94 18, 92 22 Z"
-          fill="url(#antennaGrad)"
-          transform="translate(6, -8) scale(0.7) rotate(15 92 22)"
-        />
+        {/* Right Heart Tip with Flutter */}
+        <g
+          style={{
+            transformOrigin: '92px 22px',
+            animation: 'antennaFlutterRight 2.4s ease-in-out infinite 0.3s',
+          }}
+        >
+          <path
+            d="M 92 22 C 90 18, 84 18, 83 23 C 82 28, 89 32, 92 34 C 95 32, 102 28, 101 23 C 100 18, 94 18, 92 22 Z"
+            fill="url(#antennaGrad)"
+          />
+        </g>
 
         {/* Main Chubby Bug Body */}
         <circle
@@ -119,8 +138,8 @@ export default function LoveBug({ mood = 'happy', size = 110, className = '' }) 
         <ellipse cx="60" cy="78" rx="26" ry="22" fill="url(#bugBellyGrad)" opacity="0.85" />
 
         {/* Rosy Blush Cheeks */}
-        <ellipse cx="36" cy="74" rx="7" ry="4.5" fill="#FA8FA7" opacity="0.65" />
-        <ellipse cx="84" cy="74" rx="7" ry="4.5" fill="#FA8FA7" opacity="0.65" />
+        <ellipse cx="36" cy="74" rx="7.5" ry="5" fill="#FA8FA7" opacity="0.75" />
+        <ellipse cx="84" cy="74" rx="7.5" ry="5" fill="#FA8FA7" opacity="0.75" />
 
         {/* --- MOOD EXPRESSIONS --- */}
         {mood === 'sleepy' && (
@@ -150,7 +169,7 @@ export default function LoveBug({ mood = 'happy', size = 110, className = '' }) 
 
         {mood === 'love' && (
           <g>
-            {/* Heart eyes */}
+            {/* Pulsing Heart eyes */}
             <path
               d="M 47 62 C 45 58, 39 58, 38 63 C 37 68, 44 72, 47 74 C 50 72, 57 68, 56 63 C 55 58, 49 58, 47 62 Z"
               fill="#D93864"
@@ -181,9 +200,11 @@ export default function LoveBug({ mood = 'happy', size = 110, className = '' }) 
           </g>
         )}
 
-        {/* Tiny Sparkles beside mascot */}
-        <g opacity="0.8">
+        {/* Twinkling Sparkles beside mascot */}
+        <g style={{ animation: 'sparkleTwinkle 2.4s infinite ease-in-out', transformOrigin: '16px 54px' }}>
           <path d="M 16 48 L 18 52 L 22 54 L 18 56 L 16 60 L 14 56 L 10 54 L 14 52 Z" fill="#FFE5A3" />
+        </g>
+        <g style={{ animation: 'sparkleTwinkle 2.8s infinite ease-in-out 0.8s', transformOrigin: '102px 82px' }}>
           <path d="M 102 78 L 103.5 81 L 107 82.5 L 103.5 84 L 102 87 L 100.5 84 L 97 82.5 L 100.5 81 Z" fill="#FFE5A3" />
         </g>
       </svg>
