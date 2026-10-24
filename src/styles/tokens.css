@@ -1,0 +1,63 @@
+/* ==========================================================================
+   LOVE BUG DESIGN TOKENS
+   Palette, typography, radii, shadows, and layout spacing.
+   Single source of truth for design variables.
+   ========================================================================== */
+
+:root {
+  /* Color Palette */
+  --color-blush-pink: #F8C9D8;
+  --color-warm-cream: #FFF5E5;
+  --color-soft-lavender: #DCD4F7;
+  --color-muted-rose: #D985A3;
+  --color-deep-rose: #C26383;
+  --color-soft-sage: #C9DCCB;
+  --color-warm-brown: #4A2F2A;
+  --color-warm-brown-light: #73534C;
+  --color-whatsapp: #7FB88A;
+
+  /* Card and Glass Surfaces */
+  --color-glass-bg: rgba(255, 255, 255, 0.72);
+  --color-glass-border: rgba(255, 255, 255, 0.65);
+  --color-glass-highlight: rgba(255, 255, 255, 0.9);
+  --color-glass-card-inner: rgba(255, 250, 245, 0.6);
+
+  /* Shadows */
+  --shadow-soft-rose: 0 10px 30px -5px rgba(217, 133, 163, 0.25);
+  --shadow-pill: 0 8px 24px -4px rgba(217, 133, 163, 0.35);
+  --shadow-card: 0 16px 40px -10px rgba(184, 122, 148, 0.2);
+  --shadow-glow: 0 0 25px rgba(248, 201, 216, 0.6);
+
+  /* Typography */
+  --font-heading: 'Fraunces', Georgia, serif;
+  --font-body: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-romantic: 'Caveat', cursive, 'Brush Script MT', sans-serif;
+
+  /* Border Radii */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-lg: 24px;
+  --radius-xl: 32px;
+  --radius-pill: 9999px;
+
+  /* Spacing */
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* Maximum card width for mobile-first layout */
+  --max-content-width: 440px;
+}
+
+/* Dark Mode Theme */
+[data-theme='dark'] {
+  --color-warm-brown: #FFF0F4;
+  --color-warm-brown-light: #E0C8D0;
+  --color-glass-bg: rgba(45, 27, 45, 0.78);
+  --color-glass-border: rgba(248, 201, 216, 0.18);
+  --color-glass-card-inner: rgba(60, 36, 60, 0.55);
+  --shadow-card: 0 16px 40px -10px rgba(0, 0, 0, 0.5);
+}

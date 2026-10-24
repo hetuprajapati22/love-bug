@@ -1,0 +1,265 @@
+@import './tokens.css';
+@import './animations.css';
+
+/* ==========================================================================
+   LOVE BUG GLOBAL STYLES
+   Reset, typography, backgrounds, glassmorphism cards, buttons & layout.
+   ========================================================================== */
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  min-height: 100vh;
+  width: 100%;
+  font-family: var(--font-body);
+  color: var(--color-warm-brown);
+  background-color: var(--color-warm-cream);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* Moving pastel animated gradient background */
+body {
+  background: linear-gradient(135deg, #FFF5E5 0%, #F8C9D8 45%, #DCD4F7 80%, #FFF5E5 100%);
+  background-size: 300% 300%;
+  animation: pastelGradientFlow 20s ease infinite;
+}
+
+[data-theme='dark'] body {
+  background: linear-gradient(135deg, #1F1420 0%, #30172A 50%, #211529 100%);
+  background-size: 300% 300%;
+  animation: pastelGradientFlow 25s ease infinite;
+}
+
+/* Typography Defaults */
+h1, h2, h3, h4 {
+  font-family: var(--font-heading);
+  color: var(--color-warm-brown);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+p {
+  line-height: 1.55;
+  color: var(--color-warm-brown-light);
+}
+
+/* Shimmer title */
+.shimmer-text {
+  background: linear-gradient(90deg, #C26383, #D985A3, #8A72B8, #C26383);
+  background-size: 200% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: titleShimmer 5s linear infinite;
+  display: inline-block;
+}
+
+/* Layout App Wrapper */
+.app-viewport {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  z-index: 1;
+}
+
+/* Central Mobile-First Container */
+.screen-container {
+  width: 100%;
+  max-width: var(--max-content-width);
+  margin: 0 auto;
+  position: relative;
+  z-index: 2;
+}
+
+/* Frosted Glass Card */
+.glass-card {
+  background: var(--color-glass-bg);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1.5px solid var(--color-glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-card);
+  padding: var(--space-xl) var(--space-lg);
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+/* Soft internal glow inside card */
+.glass-card::before {
+  content: '';
+  position: absolute;
+  top: -20%;
+  left: -20%;
+  width: 140%;
+  height: 50%;
+  background: radial-gradient(circle, rgba(248, 201, 216, 0.45) 0%, rgba(220, 212, 247, 0.2) 60%, transparent 100%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.glass-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* Lift on hover for interactive cards */
+.interactive-card {
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
+}
+
+.interactive-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 36px -8px rgba(184, 122, 148, 0.3);
+}
+
+.interactive-card:active {
+  transform: translateY(0);
+}
+
+/* Pill Buttons */
+.btn-pill-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 14px 28px;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: linear-gradient(135deg, #E68FA9 0%, #D985A3 50%, #C26383 100%);
+  color: #FFFFFF;
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+  box-shadow: var(--shadow-pill);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  text-decoration: none;
+}
+
+/* Shine Sweep on Button */
+.btn-pill-primary::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transform: skewX(-20deg);
+  animation: shineSweep 4s infinite ease-in-out;
+}
+
+.btn-pill-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px -3px rgba(194, 99, 131, 0.5);
+}
+
+.btn-pill-primary:active {
+  transform: translateY(1px);
+}
+
+.btn-pill-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 13px 24px;
+  border-radius: var(--radius-pill);
+  border: 1.5px solid var(--color-muted-rose);
+  background: rgba(255, 255, 255, 0.85);
+  color: var(--color-warm-brown);
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+}
+
+.btn-pill-secondary:hover {
+  background: #FFFFFF;
+  border-color: var(--color-deep-rose);
+  transform: translateY(-1px);
+}
+
+/* Disabled Button state */
+button:disabled, .btn-disabled {
+  opacity: 0.55;
+  cursor: not-allowed !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* Romantic Letter typography style */
+.romantic-text {
+  font-family: var(--font-romantic);
+  font-size: 1.45rem;
+  line-height: 1.4;
+  color: var(--color-warm-brown);
+}
+
+/* Subtle badge / pill chips */
+.badge-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid var(--color-glass-border);
+  color: var(--color-warm-brown);
+}
+
+.badge-chip.pink {
+  background: rgba(248, 201, 216, 0.5);
+  color: #8C3754;
+}
+
+.badge-chip.lavender {
+  background: rgba(220, 212, 247, 0.6);
+  color: #55447C;
+}
+
+.badge-chip.sage {
+  background: rgba(201, 220, 203, 0.6);
+  color: #35583B;
+}
+
+/* Floating Hearts Background Layer */
+.floating-hearts-layer {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 0;
+}
+
+.floating-heart-item {
+  position: absolute;
+  bottom: -20px;
+  color: var(--color-muted-rose);
+  user-select: none;
+  animation: floatUpward linear infinite;
+  opacity: 0;
+}
