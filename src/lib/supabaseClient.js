@@ -1,8 +1,16 @@
+import { createClient } from '@supabase/supabase-js';
+
 /**
  * Supabase Client Initializer
- * This client will be connected in Step 2 with VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.
- * Only the public anon key is used in the frontend.
+ * Connected using environment variables from .env.local.
+ * Only the public publishable/anon key is used in frontend client.
  */
 
-// Placeholder for Step 2 integration
-export const supabase = null;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!supabaseUrl || !supabaseAnonKey) {
+  console.warn('Supabase URL or Publishable Key is missing in environment variables.');
+}
+
+export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
