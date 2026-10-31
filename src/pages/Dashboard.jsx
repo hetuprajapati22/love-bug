@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { coupleService } from '../services/coupleService';
 import LoveBug from '../components/mascot/LoveBug';
+import { soundEffects } from '../utils/soundEffects';
 
 /**
  * Dashboard Component
@@ -14,6 +15,13 @@ export default function Dashboard() {
 
   const [mascotMood, setMascotMood] = useState('happy');
   const [unlinking, setUnlinking] = useState(false);
+  const [muted, setMuted] = useState(soundEffects.isMuted());
+
+  const handleToggleSound = () => {
+    const isNowMuted = soundEffects.toggleMute();
+    setMuted(isNowMuted);
+    if (!isNowMuted) soundEffects.playPop();
+  };
 
   const games = [
     {
@@ -116,22 +124,44 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Streak or Connect Badge */}
-        {isCoupled ? (
-          <div className="badge-chip pink" style={{ padding: '6px 14px', fontSize: '0.85rem' }}>
-            <span>🔥</span>
-            <strong>1 Day</strong>
-          </div>
-        ) : (
+        {/* Streak & Sound Controls */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             type="button"
-            className="badge-chip pink"
-            onClick={() => navigate('/couple')}
-            style={{ cursor: 'pointer', padding: '6px 12px' }}
+            onClick={handleToggleSound}
+            title={muted ? 'Unmute Sounds' : 'Mute Sounds'}
+            style={{
+              background: 'none',
+              border: '1.5px solid var(--color-glass-border)',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.9rem',
+            }}
           >
-            <span>🔗 Connect Partner</span>
+            {muted ? '🔇' : '🔊'}
           </button>
-        )}
+
+          {isCoupled ? (
+            <div className="badge-chip pink" style={{ padding: '6px 12px', fontSize: '0.82rem' }}>
+              <span>🔥</span>
+              <strong>1 Day</strong>
+            </div>
+          ) : (
+            <button
+              type="button"
+              className="badge-chip pink"
+              onClick={() => navigate('/couple')}
+              style={{ cursor: 'pointer', padding: '6px 12px' }}
+            >
+              <span>🔗 Connect</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Unpaired Banner (If not coupled yet) */}
@@ -281,23 +311,33 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* Combined Result Teaser */}
+      {/* Combined Result Card (Click to preview Love Letter!) */}
       <div
-        className="glass-card"
+        className="glass-card interactive-card"
+        onClick={() => {
+          soundEffects.playPop();
+          navigate('/results');
+        }}
         style={{
           marginTop: '16px',
           textAlign: 'center',
-          background: 'linear-gradient(135deg, rgba(255, 245, 229, 0.8) 0%, rgba(248, 201, 216, 0.6) 100%)',
+          cursor: 'pointer',
+          background: 'linear-gradient(135deg, rgba(255, 245, 229, 0.9) 0%, rgba(248, 201, 216, 0.7) 100%)',
+          border: '1.5px solid var(--color-muted-rose)',
         }}
       >
-        <span style={{ fontSize: '1.6rem', display: 'block', marginBottom: '4px' }}>💌</span>
-        <h4 style={{ fontSize: '1.05rem', marginBottom: '4px' }}>Combined Love Letter</h4>
-        <p className="romantic-text" style={{ fontSize: '1.15rem', margin: '4px 0 10px' }}>
-          "Complete all 3 games together to seal your special love letter..."
+        <span style={{ fontSize: '1.8rem', display: 'block', marginBottom: '4px' }}>💌</span>
+        <h4 style={{ fontSize: '1.08rem', marginBottom: '4px' }}>Our Sealed Love Letter</h4>
+        <p className="romantic-text" style={{ fontSize: '1.2rem', margin: '4px 0 10px' }}>
+          "Through every question, my heart finds its happiest home next to you..."
         </p>
-        <span className="badge-chip lavender" style={{ fontSize: '0.74rem' }}>
-          🔒 Unlocks when all 3 games reach 60 levels
-        </span>
+        <button
+          type="button"
+          className="btn-pill-primary"
+          style={{ width: 'auto', padding: '6px 18px', fontSize: '0.82rem' }}
+        >
+          View Love Letter & Chemistry ➔
+        </button>
       </div>
 
       {/* Account & Unlink Actions */}

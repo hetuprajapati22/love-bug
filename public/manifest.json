@@ -1,0 +1,17 @@
+{
+  "name": "Love Bug",
+  "short_name": "Love Bug",
+  "description": "A cute, romantic web game for couples to connect, laugh, and play together.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FFF5E5",
+  "theme_color": "#F8C9D8",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

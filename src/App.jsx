@@ -7,10 +7,11 @@ import CoupleRoom from './pages/CoupleRoom';
 import Dashboard from './pages/Dashboard';
 import Lobby from './pages/Lobby';
 import GameScreen from './pages/GameScreen';
+import Results from './pages/Results';
 import DashboardDemo from './pages/DashboardDemo';
 import FloatingHearts from './components/ui/FloatingHearts';
 import LoveBug from './components/mascot/LoveBug';
-import LoveBugChat from './components/chat/LoveBugChat';
+import CoupleChat from './components/chat/CoupleChat';
 
 /**
  * Route Guard Component
@@ -50,8 +51,8 @@ export default function App() {
         {/* Background Floating Hearts */}
         <FloatingHearts count={20} />
 
-        {/* Global Couple Chatbot Assistant */}
-        <LoveBugChat />
+        {/* Global Couple Chatbot & Partner Live Chat */}
+        <CoupleChat />
 
         {/* Central App Viewport */}
         <div className="app-viewport">
@@ -97,6 +98,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <GameScreen />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/results"
+              element={
+                <ProtectedRoute>
+                  <Results />
                 </ProtectedRoute>
               }
             />

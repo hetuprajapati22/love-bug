@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { sessionService } from '../services/sessionService';
 import { supabase } from '../lib/supabaseClient';
 import LoveBug from '../components/mascot/LoveBug';
+import { soundEffects } from '../utils/soundEffects';
 
 // ── Question sets ─────────────────────────────────────────────────────────────
 import { thisOrThatQuestions } from '../games/thisOrThat/thisOrThatQuestions';
@@ -189,11 +190,17 @@ export default function GameScreen() {
         text,
       });
 
+      soundEffects.playLock();
       setLockedAnswer({ choice: selectedOption, text });
 
       if (res.both_answered) {
         setRevealData({ partner_1_answer: res.partner_1_answer, partner_2_answer: res.partner_2_answer });
         setRevealed(true);
+        if (res.partner_1_answer?.choice === res.partner_2_answer?.choice) {
+          soundEffects.playMatch();
+        } else {
+          soundEffects.playPop();
+        }
       }
     } catch (err) {
       console.error(err);
@@ -217,11 +224,13 @@ export default function GameScreen() {
         text: chosenText,
       });
 
+      soundEffects.playLock();
       setLockedAnswer({ choice: chosenType, text: chosenText });
 
       if (res.both_answered) {
         setRevealData({ partner_1_answer: res.partner_1_answer, partner_2_answer: res.partner_2_answer });
         setRevealed(true);
+        soundEffects.playMatch();
       }
     } catch (err) {
       console.error(err);
@@ -238,10 +247,11 @@ export default function GameScreen() {
     setErrorMsg('');
     try {
       const res = await sessionService.advanceLevel(sessionId);
-      if (res.status === 'completed') {
-        alert('You completed all questions together! 🎉💌 Results screen unlocks in Step 8!');
-        navigate('/');
+      if (res.status === 'completed' || currentLevel >= 60) {
+        soundEffects.playCelebrate();
+        navigate(`/results?session=${sessionId}&game=${gameKey}`);
       } else {
+        soundEffects.playPop();
         setSelectedOption(null);
         setLockedAnswer(null);
         setRevealed(false);
