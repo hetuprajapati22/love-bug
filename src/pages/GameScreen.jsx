@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { sessionService } from '../services/sessionService';
 import { supabase } from '../lib/supabaseClient';
 import LoveBug from '../components/mascot/LoveBug';
+import { thisOrThatQuestions } from '../games/thisOrThat/thisOrThatQuestions';
 
 /**
  * GameScreen Component
@@ -27,34 +28,11 @@ export default function GameScreen() {
   const [advancing, setAdvancing] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Sample questions placeholder for Step 5 (full 300 questions will be seeded in Step 6)
-  const sampleQuestions = [
-    {
-      id: 1,
-      text: 'Sunday Morning Vibe: Cozy breakfast in bed or morning walk together?',
-      optionA: '🥞 Breakfast in bed',
-      optionB: '🌿 Morning walk together',
-    },
-    {
-      id: 2,
-      text: 'Movie Night: Soft romantic comedy or thrilling mystery?',
-      optionA: '🍿 Romantic Comedy',
-      optionB: '🔍 Thrilling Mystery',
-    },
-    {
-      id: 3,
-      text: 'Dream Date: Stargazing rooftop picnic or candlelit quiet dinner?',
-      optionA: '✨ Stargazing Rooftop',
-      optionB: '🕯️ Candlelit Dinner',
-    },
-  ];
-
   const currentLevel = session?.current_level || 1;
-  const currentStage = session?.current_stage || 1;
+  const questionIndex = Math.min(Math.max(1, currentLevel), 60) - 1;
+  const question = thisOrThatQuestions[questionIndex] || thisOrThatQuestions[0];
+  const currentStage = question.stage;
   const stageNames = ['Playful', 'Cozy', 'Closer', 'Deep', 'Heart-to-heart'];
-
-  // Current question data
-  const question = sampleQuestions[(currentLevel - 1) % sampleQuestions.length];
 
   const myPetName = profile?.pet_name || 'You';
   const partnerPetName = couple?.partner_pet_name || 'Partner';
