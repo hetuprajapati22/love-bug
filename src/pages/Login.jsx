@@ -1,19 +1,42 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { authService } from '../services/authService';
+import { useAuth } from '../hooks/useAuth';
 import LoveBug from '../components/mascot/LoveBug';
 
 /**
  * Login Page Component
- * Clean, romantic login screen with Google OAuth button and feature highlights.
+ * Connects with Google OAuth via Supabase Auth.
  */
 export default function Login() {
   const navigate = useNavigate();
+  const { user, isCoupled, isProfileComplete } = useAuth();
+  const [loggingIn, setLoggingIn] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
-  const handleGoogleLogin = () => {
-    // In Step 1, OAuth is not wired to Supabase yet.
-    // We direct the user to explore the Demo Dashboard.
-    alert('Google Login will be connected in Step 2 with Supabase! Redirecting to visual Demo Dashboard...');
-    navigate('/demo');
+  // If already authenticated, redirect
+  React.useEffect(() => {
+    if (user) {
+      if (!isProfileComplete) {
+        navigate('/setup');
+      } else if (!isCoupled) {
+        navigate('/couple');
+      } else {
+        navigate('/');
+      }
+    }
+  }, [user, isCoupled, isProfileComplete, navigate]);
+
+  const handleGoogleLogin = async () => {
+    setErrorMsg('');
+    setLoggingIn(true);
+    try {
+      await authService.signInWithGoogle();
+    } catch (err) {
+      console.error('Google login error:', err);
+      setErrorMsg(err.message || 'Could not connect with Google. Please try again.');
+      setLoggingIn(false);
+    }
   };
 
   return (
@@ -37,10 +60,28 @@ export default function Login() {
           </p>
         </div>
 
+        {/* Error message */}
+        {errorMsg && (
+          <div
+            style={{
+              padding: '10px 14px',
+              borderRadius: 'var(--radius-md)',
+              background: 'rgba(235, 87, 87, 0.12)',
+              border: '1px solid rgba(235, 87, 87, 0.3)',
+              color: '#9E2A2B',
+              fontSize: '0.84rem',
+              marginBottom: '16px',
+            }}
+          >
+            {errorMsg}
+          </div>
+        )}
+
         {/* Action Button: Continue with Google */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '28px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
           <button
             type="button"
+            disabled={loggingIn}
             className="btn-pill-primary animate-pulse-subtle"
             onClick={handleGoogleLogin}
             aria-label="Continue with Google"
@@ -64,7 +105,7 @@ export default function Login() {
                 d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.1 0-5.8-2.5-6.7-5.3L1.6 16c1.9 3.8 5.8 7 10.4 7z"
               />
             </svg>
-            Continue with Google
+            {loggingIn ? 'Connecting to Google...' : 'Continue with Google'}
           </button>
 
           {/* Direct Demo Button */}
@@ -78,7 +119,7 @@ export default function Login() {
         </div>
 
         {/* Small Trust Note */}
-        <p style={{ marginTop: '20px', fontSize: '0.78rem', color: 'var(--color-warm-brown-light)' }}>
+        <p style={{ marginTop: '12px', fontSize: '0.78rem', color: 'var(--color-warm-brown-light)' }}>
           18+ couples only • Private sessions • No permanent chat stored
         </p>
       </div>
