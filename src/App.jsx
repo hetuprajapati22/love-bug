@@ -120,6 +120,14 @@ export default function App() {
               }
             />
             <Route
+              path="/couple-dashboard"
+              element={
+                <ProtectedRoute>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin"
               element={
                 <ProtectedRoute>

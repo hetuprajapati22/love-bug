@@ -301,12 +301,12 @@ export default function Settings() {
         )}
       </div>
 
-      {/* Admin Panel Access Card */}
+      {/* Couple Dashboard Access Card */}
       <div
         className="glass-card interactive-card"
         onClick={() => {
           soundEffects.playPop();
-          navigate('/admin');
+          navigate('/couple-dashboard');
         }}
         style={{
           marginBottom: '16px',
@@ -320,13 +320,13 @@ export default function Settings() {
         }}
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <span style={{ fontSize: '1.6rem' }}>🛡️</span>
+          <span style={{ fontSize: '1.6rem' }}>💑</span>
           <div>
             <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--color-warm-brown)' }}>
-              Admin Dashboard
+              Couple Dashboard
             </div>
             <div style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)' }}>
-              Manage all 180 questions, view couples & system controls
+              View milestones, love streak & game controls
             </div>
           </div>
         </div>

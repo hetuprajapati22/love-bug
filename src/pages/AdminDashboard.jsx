@@ -1,85 +1,65 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import LoveBug from '../components/mascot/LoveBug';
-import { thisOrThatQuestions } from '../games/thisOrThat/thisOrThatQuestions';
-import { knowMeQuestions } from '../games/knowMe/knowMeQuestions';
-import { truthOrDareQuestions } from '../games/truthOrDare/truthOrDareQuestions';
+import { useAuth } from '../hooks/useAuth';
 import { soundEffects } from '../utils/soundEffects';
 import { supabase } from '../lib/supabaseClient';
 
 /**
- * AdminDashboard Component
- * Control center for managing all 180 questions, filtering by stages,
- * inspecting couple sessions, and resetting test data.
+ * CoupleDashboard Component
+ * Intimate relationship hub for couples:
+ * View love stats, streak, milestones, quick game launcher,
+ * love letter shortcut, and session controls. Zero question spoilers!
  */
-export default function AdminDashboard() {
+export default function CoupleDashboard() {
   const navigate = useNavigate();
+  const { profile, couple, isCoupled } = useAuth();
 
-  const [activeGame, setActiveGame] = useState('all'); // 'all' | 'this_or_that' | 'know_me' | 'truth_or_dare'
-  const [selectedStage, setSelectedStage] = useState(0); // 0 = all, 1-5 = stages
-  const [searchQuery, setSearchQuery] = useState('');
   const [resetting, setResetting] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
 
-  // Normalize all questions for unified viewing
-  const allQuestions = useMemo(() => {
-    const tot = thisOrThatQuestions.map((q) => ({
-      ...q,
-      gameType: 'this_or_that',
-      gameName: 'This or That 💗',
-      displayTitle: q.text,
-      details: `A: ${q.optionA} | B: ${q.optionB}`,
-    }));
+  const myPetName = profile?.pet_name || 'You';
+  const partnerPetName = couple?.partner_pet_name || 'Partner';
 
-    const km = knowMeQuestions.map((q) => {
-      let details = '';
-      if (q.options) {
-        details = q.options.map((o) => `${o.key}: ${o.text}`).join(' | ');
-      } else {
-        details = `A: ${q.optionA || ''} | B: ${q.optionB || ''} | C: ${q.optionC || ''} | D: ${q.optionD || ''}`;
-      }
-      return {
-        ...q,
-        gameType: 'know_me',
-        gameName: 'Know Me 🥹',
-        displayTitle: q.text,
-        details,
-      };
-    });
+  // Games summary list (without revealing questions!)
+  const games = [
+    {
+      id: 'this_or_that',
+      title: 'This or That',
+      icon: '💗',
+      tagline: 'Discover how your choices align',
+      totalLevels: 60,
+      badge: 'pink',
+    },
+    {
+      id: 'know_me',
+      title: 'How Well Do You Know Me?',
+      icon: '🥹',
+      tagline: 'Guess each other’s inner thoughts',
+      totalLevels: 60,
+      badge: 'lavender',
+    },
+    {
+      id: 'truth_or_dare',
+      title: 'Truth or Dare',
+      icon: '😈',
+      tagline: 'Playful confessions & sweet challenges',
+      totalLevels: 60,
+      badge: 'sage',
+    },
+  ];
 
-    const tod = truthOrDareQuestions.map((q) => ({
-      ...q,
-      gameType: 'truth_or_dare',
-      gameName: 'Truth or Dare 😈',
-      displayTitle: `Truth: ${q.truth}`,
-      details: `Dare: ${q.dare}`,
-    }));
-
-    return [...tot, ...km, ...tod];
-  }, []);
-
-  // Filtered list
-  const filteredQuestions = useMemo(() => {
-    return allQuestions.filter((q) => {
-      const matchGame = activeGame === 'all' || q.gameType === activeGame;
-      const matchStage = selectedStage === 0 || q.stage === selectedStage;
-      const qText = `${q.displayTitle} ${q.details}`.toLowerCase();
-      const matchSearch = !searchQuery.trim() || qText.includes(searchQuery.toLowerCase());
-      return matchGame && matchStage && matchSearch;
-    });
-  }, [allQuestions, activeGame, selectedStage, searchQuery]);
-
-  // Clean / reset all active test sessions
-  const handleResetAllSessions = async () => {
+  // Reset active test sessions back to Level 1
+  const handleResetSessions = async () => {
     const ok = window.confirm(
-      'Reset all active test game sessions? This will let both partners start completely fresh from lobby level 1.'
+      'Restart all games from Level 1 for both of you? You can play from the very beginning!'
     );
     if (!ok) return;
 
     setResetting(true);
     setStatusMsg('');
     try {
-      if (supabase) {
+      if (supabase && couple?.couple_id) {
         await supabase
           .from('game_sessions')
           .update({
@@ -89,20 +69,18 @@ export default function AdminDashboard() {
             current_level: 1,
             current_stage: 1,
           })
-          .neq('id', '00000000-0000-0000-0000-000000000000');
+          .eq('couple_id', couple.couple_id);
       }
       soundEffects.playPop();
-      setStatusMsg('✓ All active game sessions reset to Level 1 Waiting State!');
+      setStatusMsg('✓ All games reset to Level 1 Waiting State! Ready for a fresh round!');
       setTimeout(() => setStatusMsg(''), 3500);
     } catch (err) {
       console.error(err);
-      setStatusMsg(`Notice: ${err.message || 'Session reset attempted.'}`);
+      setStatusMsg(`Notice: ${err.message || 'Game session reset.'}`);
     } finally {
       setResetting(false);
     }
   };
-
-  const stageLabels = ['All Stages', 'Stage 1: Playful', 'Stage 2: Cozy', 'Stage 3: Closer', 'Stage 4: Deep', 'Stage 5: Spicy'];
 
   return (
     <div className="screen-container animate-fade-in" style={{ paddingBottom: '60px' }}>
@@ -117,194 +95,205 @@ export default function AdminDashboard() {
           className="btn-pill-secondary"
           style={{ width: 'auto', padding: '6px 16px', fontSize: '0.84rem' }}
         >
-          ← Exit to Dashboard
+          ← Home
         </button>
-        <span className="badge-chip lavender" style={{ fontWeight: 800 }}>
-          🛡️ Admin Panel
+        <span className="badge-chip pink" style={{ fontWeight: 800 }}>
+          💑 Couple Dashboard
         </span>
+        <button
+          type="button"
+          onClick={() => {
+            soundEffects.playPop();
+            navigate('/settings');
+          }}
+          className="btn-pill-secondary"
+          style={{ width: 'auto', padding: '6px 14px', fontSize: '0.84rem' }}
+        >
+          ⚙️ Settings
+        </button>
       </div>
 
-      {/* Hero Card */}
+      {/* Hero Couple Presentation Card */}
       <div className="glass-card" style={{ marginBottom: '16px', textAlign: 'center' }}>
-        <div className="animate-mascot-bob" style={{ marginBottom: '8px' }}>
-          <LoveBug mood="love" size={70} />
+        <div className="animate-mascot-bob" style={{ marginBottom: '10px' }}>
+          <LoveBug mood="love" size={82} />
         </div>
-        <h2 style={{ fontSize: '1.4rem', marginBottom: '4px' }}>
-          Love Bug Game Manager
-        </h2>
-        <p style={{ fontSize: '0.84rem', color: 'var(--color-warm-brown-light)', marginBottom: '16px' }}>
-          View, audit & manage all 180 questions across 5 romantic stages.
-        </p>
 
-        {/* Quick Stats Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '10px' }}>
+        <h2 style={{ fontSize: '1.45rem', marginBottom: '4px', color: 'var(--color-warm-brown)' }}>
+          {isCoupled ? `${myPetName} & ${partnerPetName}` : myPetName}
+        </h2>
+        <span className="badge-chip lavender" style={{ fontSize: '0.78rem', marginBottom: '18px' }}>
+          👑 The Inseparable Couple
+        </span>
+
+        {/* 4 Relationship Milestones */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginTop: '12px' }}>
           <div
             style={{
-              padding: '10px',
+              padding: '14px 10px',
               borderRadius: 'var(--radius-md)',
               background: 'rgba(248, 201, 216, 0.45)',
-              border: '1px solid var(--color-glass-border)',
+              border: '1.5px solid var(--color-glass-border)',
             }}
           >
-            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--color-warm-brown)' }}>60</div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700 }}>This or That 💗</div>
+            <div style={{ fontSize: '1.4rem' }}>🔥</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--color-warm-brown)' }}>1 Day</div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)', fontWeight: 700 }}>
+              Love Streak
+            </div>
           </div>
+
           <div
             style={{
-              padding: '10px',
+              padding: '14px 10px',
               borderRadius: 'var(--radius-md)',
               background: 'rgba(220, 212, 247, 0.45)',
-              border: '1px solid var(--color-glass-border)',
+              border: '1.5px solid var(--color-glass-border)',
             }}
           >
-            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--color-warm-brown)' }}>60</div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700 }}>Know Me 🥹</div>
+            <div style={{ fontSize: '1.4rem' }}>🎮</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--color-warm-brown)' }}>3 Modes</div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)', fontWeight: 700 }}>
+              Available Games
+            </div>
           </div>
+
           <div
             style={{
-              padding: '10px',
+              padding: '14px 10px',
               borderRadius: 'var(--radius-md)',
               background: 'rgba(201, 220, 203, 0.45)',
-              border: '1px solid var(--color-glass-border)',
+              border: '1.5px solid var(--color-glass-border)',
             }}
           >
-            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--color-warm-brown)' }}>60</div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 700 }}>Truth or Dare 😈</div>
+            <div style={{ fontSize: '1.4rem' }}>💖</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--color-warm-brown)' }}>100%</div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)', fontWeight: 700 }}>
+              Chemistry Score
+            </div>
+          </div>
+
+          <div
+            style={{
+              padding: '14px 10px',
+              borderRadius: 'var(--radius-md)',
+              background: 'rgba(255, 245, 229, 0.85)',
+              border: '1.5px solid var(--color-glass-border)',
+            }}
+          >
+            <div style={{ fontSize: '1.4rem' }}>✨</div>
+            <div style={{ fontSize: '1.25rem', fontWeight: 900, color: 'var(--color-warm-brown)' }}>
+              {isCoupled ? 'Paired' : 'Solo'}
+            </div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)', fontWeight: 700 }}>
+              Status
+            </div>
           </div>
         </div>
+      </div>
 
-        {/* Session Reset Tool */}
-        <div style={{ marginTop: '16px', borderTop: '1px dashed var(--color-glass-border)', paddingTop: '12px' }}>
-          <button
-            type="button"
-            onClick={handleResetAllSessions}
-            disabled={resetting}
-            className="btn-pill-secondary"
-            style={{ fontSize: '0.82rem', padding: '8px 18px', color: '#9E2A2B', borderColor: 'rgba(235,87,87,0.3)' }}
-          >
-            {resetting ? 'Resetting...' : '🔄 Reset All Test Game Sessions'}
-          </button>
-          {statusMsg && (
-            <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#2D6A4F', fontWeight: 700 }}>
-              {statusMsg}
-            </div>
-          )}
+      {/* Sealed Love Letter Quick Access */}
+      <div
+        className="glass-card interactive-card"
+        onClick={() => {
+          soundEffects.playPop();
+          navigate('/results');
+        }}
+        style={{
+          marginBottom: '16px',
+          padding: '16px 18px',
+          background: 'linear-gradient(135deg, rgba(255, 245, 229, 0.95) 0%, rgba(248, 201, 216, 0.75) 100%)',
+          border: '1.5px solid var(--color-muted-rose)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <span style={{ fontSize: '1.8rem' }}>💌</span>
+          <div>
+            <h4 style={{ fontSize: '1rem', fontWeight: 800, margin: 0, color: 'var(--color-warm-brown)' }}>
+              View Sealed Love Letter
+            </h4>
+            <p style={{ fontSize: '0.76rem', margin: '2px 0 0', color: 'var(--color-warm-brown-light)' }}>
+              Open your personalized cursive letter & share on WhatsApp
+            </p>
+          </div>
         </div>
+        <span style={{ fontSize: '1.1rem' }}>➔</span>
       </div>
 
-      {/* Filter Tabs: Game Type */}
-      <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', marginBottom: '12px', paddingBottom: '4px' }}>
-        {[
-          { key: 'all', label: 'All 180' },
-          { key: 'this_or_that', label: 'This or That (60)' },
-          { key: 'know_me', label: 'Know Me (60)' },
-          { key: 'truth_or_dare', label: 'Truth or Dare (60)' },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            type="button"
-            onClick={() => {
-              setActiveGame(tab.key);
-              soundEffects.playPop();
-            }}
-            className={`badge-chip ${activeGame === tab.key ? 'pink' : ''}`}
-            style={{
-              cursor: 'pointer',
-              whiteSpace: 'nowrap',
-              fontSize: '0.78rem',
-              fontWeight: 800,
-              border: activeGame === tab.key ? '1.5px solid var(--color-deep-rose)' : '1px solid var(--color-glass-border)',
-            }}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Quick Game Launch Section */}
+      <div style={{ marginBottom: '16px' }}>
+        <h3 style={{ fontSize: '1.05rem', marginBottom: '10px', paddingLeft: '4px', color: 'var(--color-warm-brown)' }}>
+          Play Together 🎮
+        </h3>
 
-      {/* Search & Stage Filter Bar */}
-      <div className="glass-card" style={{ marginBottom: '16px', padding: '14px 16px' }}>
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="🔍 Search in questions or options..."
-          style={{
-            width: '100%',
-            padding: '10px 14px',
-            borderRadius: 'var(--radius-pill)',
-            border: '1.5px solid var(--color-glass-border)',
-            outline: 'none',
-            fontSize: '0.85rem',
-            marginBottom: '10px',
-            color: 'var(--color-warm-brown)',
-          }}
-        />
-
-        <div style={{ display: 'flex', gap: '6px', overflowX: 'auto', scrollbarWidth: 'none' }}>
-          {stageLabels.map((lbl, idx) => (
-            <button
-              key={idx}
-              type="button"
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          {games.map((g) => (
+            <div
+              key={g.id}
+              className="glass-card interactive-card"
               onClick={() => {
-                setSelectedStage(idx);
                 soundEffects.playPop();
+                navigate(`/lobby?game=${g.id}`);
               }}
-              className={`badge-chip ${selectedStage === idx ? 'lavender' : ''}`}
               style={{
-                fontSize: '0.72rem',
+                padding: '14px 16px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
                 cursor: 'pointer',
-                whiteSpace: 'nowrap',
-                padding: '4px 10px',
               }}
             >
-              {lbl}
-            </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: '1.5rem' }}>{g.icon}</span>
+                <div>
+                  <h4 style={{ fontSize: '0.96rem', fontWeight: 700, margin: 0 }}>{g.title}</h4>
+                  <p style={{ fontSize: '0.76rem', margin: '2px 0 0', color: 'var(--color-warm-brown-light)' }}>
+                    {g.tagline}
+                  </p>
+                </div>
+              </div>
+              <span className={`badge-chip ${g.badge}`} style={{ fontSize: '0.72rem' }}>
+                Play ➔
+              </span>
+            </div>
           ))}
         </div>
       </div>
 
-      {/* Showing count indicator */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px', padding: '0 4px' }}>
-        <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--color-warm-brown-light)' }}>
-          Showing {filteredQuestions.length} Questions
-        </span>
-      </div>
+      {/* Session Management / Restart Option */}
+      <div className="glass-card" style={{ padding: '16px 18px', textAlign: 'center' }}>
+        <h4 style={{ fontSize: '0.95rem', marginBottom: '6px', color: 'var(--color-warm-brown)' }}>
+          Game Progress Control 🔄
+        </h4>
+        <p style={{ fontSize: '0.8rem', color: 'var(--color-warm-brown-light)', marginBottom: '12px' }}>
+          Want to play your games again from the very start? You can restart all progress back to Level 1.
+        </p>
 
-      {/* Question Cards List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        {filteredQuestions.map((q, idx) => (
-          <div
-            key={`${q.gameType}_${q.id || q.level || idx}`}
-            className="glass-card"
-            style={{
-              padding: '14px 16px',
-              background: 'rgba(255, 255, 255, 0.92)',
-              border: '1.5px solid var(--color-glass-border)',
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span className="badge-chip pink" style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
-                  {q.gameName}
-                </span>
-                <span className="badge-chip sage" style={{ fontSize: '0.7rem', padding: '2px 8px' }}>
-                  Stage {q.stage}: {q.stageLabel || q.stageName || 'Romantic'}
-                </span>
-              </div>
-              <span style={{ fontSize: '0.74rem', fontWeight: 800, color: 'var(--color-warm-brown-light)' }}>
-                #{q.id || q.level || idx + 1}
-              </span>
-            </div>
+        <button
+          type="button"
+          onClick={handleResetSessions}
+          disabled={resetting}
+          className="btn-pill-secondary"
+          style={{
+            fontSize: '0.82rem',
+            padding: '8px 20px',
+            color: '#9E2A2B',
+            borderColor: 'rgba(235, 87, 87, 0.35)',
+            background: 'rgba(235, 87, 87, 0.05)',
+          }}
+        >
+          {resetting ? 'Resetting...' : '🔄 Restart All Games from Level 1'}
+        </button>
 
-            <div style={{ fontSize: '0.94rem', fontWeight: 800, color: 'var(--color-warm-brown)', marginBottom: '6px' }}>
-              {q.displayTitle}
-            </div>
-
-            <div style={{ fontSize: '0.8rem', color: 'var(--color-warm-brown-light)', lineHeight: 1.4 }}>
-              {q.details}
-            </div>
+        {statusMsg && (
+          <div style={{ marginTop: '10px', fontSize: '0.82rem', color: '#2D6A4F', fontWeight: 700 }}>
+            {statusMsg}
           </div>
-        ))}
+        )}
       </div>
     </div>
   );
