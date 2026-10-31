@@ -126,7 +126,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* Streak & Sound Controls */}
+        {/* Header Controls: Sound & Settings */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <button
             type="button"
@@ -146,6 +146,29 @@ export default function Dashboard() {
             }}
           >
             {muted ? '🔇' : '🔊'}
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playPop();
+              navigate('/settings');
+            }}
+            title="Open Settings"
+            style={{
+              background: 'none',
+              border: '1.5px solid var(--color-glass-border)',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.95rem',
+            }}
+          >
+            ⚙️
           </button>
 
           {isCoupled ? (

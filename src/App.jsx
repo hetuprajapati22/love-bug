@@ -8,6 +8,8 @@ import Dashboard from './pages/Dashboard';
 import Lobby from './pages/Lobby';
 import GameScreen from './pages/GameScreen';
 import Results from './pages/Results';
+import Settings from './pages/Settings';
+import AdminDashboard from './pages/AdminDashboard';
 import DashboardDemo from './pages/DashboardDemo';
 import FloatingHearts from './components/ui/FloatingHearts';
 import LoveBug from './components/mascot/LoveBug';
@@ -106,6 +108,22 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Results />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/settings"
+              element={
+                <ProtectedRoute>
+                  <Settings />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute>
+                  <AdminDashboard />
                 </ProtectedRoute>
               }
             />
