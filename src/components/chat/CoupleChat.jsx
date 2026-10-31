@@ -41,7 +41,10 @@ export default function CoupleChat() {
 
   const myPetName = profile?.pet_name || 'You';
   const partnerPetName = couple?.partner_pet_name || 'Partner';
-  const coupleId = couple?.id;
+  // Note: get_my_couple_data returns 'couple_id'
+  const coupleId = couple?.couple_id || couple?.id || (user ? `couple_${user.id}` : 'demo_chat');
+
+  const channelRef = useRef(null);
 
   // Persist partner messages locally
   useEffect(() => {
@@ -66,10 +69,15 @@ export default function CoupleChat() {
           setUnreadCount((c) => c + 1);
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          channelRef.current = channel;
+        }
+      });
 
     return () => {
       supabase.removeChannel(channel);
+      channelRef.current = null;
     };
   }, [coupleId, isOpen]);
 
@@ -83,12 +91,12 @@ export default function CoupleChat() {
   // Send message to partner
   const sendPartnerMessage = async (customText) => {
     const text = customText || inputText.trim();
-    if (!text || !coupleId) return;
+    if (!text) return;
 
     soundEffects.playPop();
 
     const newMsg = {
-      id: `${Date.now()}_${user?.id}`,
+      id: `${Date.now()}_${user?.id || 'me'}`,
       senderId: user?.id,
       senderName: myPetName,
       text,
@@ -100,11 +108,19 @@ export default function CoupleChat() {
 
     // Broadcast live to partner device
     try {
-      await supabase.channel(`couple_chat_${coupleId}`).send({
-        type: 'broadcast',
-        event: 'new_message',
-        payload: newMsg,
-      });
+      if (channelRef.current) {
+        await channelRef.current.send({
+          type: 'broadcast',
+          event: 'new_message',
+          payload: newMsg,
+        });
+      } else if (supabase && coupleId) {
+        await supabase.channel(`couple_chat_${coupleId}`).send({
+          type: 'broadcast',
+          event: 'new_message',
+          payload: newMsg,
+        });
+      }
     } catch (err) {
       console.warn('Realtime chat broadcast error:', err);
     }
