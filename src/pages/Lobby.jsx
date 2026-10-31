@@ -45,7 +45,7 @@ export default function Lobby() {
       if (data.status === 'active') {
         setStarting(true);
         setTimeout(() => {
-          navigate(`/play?session=${data.session_id}`);
+          navigate(`/play?session=${data.session_id}&game=${gameType}`);
         }, 1200);
       }
     } catch (err) {
@@ -88,7 +88,7 @@ export default function Lobby() {
           if (updated.status === 'active') {
             setStarting(true);
             setTimeout(() => {
-              navigate(`/play?session=${updated.id}`);
+              navigate(`/play?session=${updated.id}&game=${gameType}`);
             }, 1200);
           }
         }
@@ -227,16 +227,43 @@ export default function Lobby() {
           )}
         </div>
 
-        {/* Leave Lobby Button */}
-        <div>
+        {/* Leave Lobby & Reset Actions */}
+        <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
           <button
             type="button"
             className="btn-pill-secondary"
             onClick={handleLeaveLobby}
-            style={{ width: 'auto', padding: '8px 24px', fontSize: '0.85rem' }}
+            style={{ width: 'auto', padding: '8px 20px', fontSize: '0.85rem' }}
           >
-            ← Leave Lobby
+            🏠 Leave to Home
           </button>
+
+          {session?.session_id && (
+            <button
+              type="button"
+              className="btn-pill-secondary"
+              onClick={async () => {
+                const ok = window.confirm('Restart this game from Level 1 for both of you?');
+                if (!ok) return;
+                try {
+                  await sessionService.resetSession(session.session_id);
+                  setSession((prev) => ({
+                    ...prev,
+                    status: 'waiting',
+                    partner_1_ready: true,
+                    partner_2_ready: false,
+                    current_level: 1,
+                  }));
+                  setStarting(false);
+                } catch (e) {
+                  alert(e.message || 'Could not reset game');
+                }
+              }}
+              style={{ width: 'auto', padding: '8px 20px', fontSize: '0.85rem' }}
+            >
+              🔄 Restart Level 1
+            </button>
+          )}
         </div>
       </div>
     </div>

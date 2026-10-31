@@ -10,6 +10,7 @@ import GameScreen from './pages/GameScreen';
 import DashboardDemo from './pages/DashboardDemo';
 import FloatingHearts from './components/ui/FloatingHearts';
 import LoveBug from './components/mascot/LoveBug';
+import LoveBugChat from './components/chat/LoveBugChat';
 
 /**
  * Route Guard Component
@@ -48,6 +49,9 @@ export default function App() {
       <AuthProvider>
         {/* Background Floating Hearts */}
         <FloatingHearts count={20} />
+
+        {/* Global Couple Chatbot Assistant */}
+        <LoveBugChat />
 
         {/* Central App Viewport */}
         <div className="app-viewport">

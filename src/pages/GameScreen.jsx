@@ -47,12 +47,13 @@ export default function GameScreen() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const sessionId = searchParams.get('session');
-  const gameKey = searchParams.get('game') || 'this_or_that';
+  const urlGameKey = searchParams.get('game');
 
   const { user, profile, couple } = useAuth();
 
   // ── Shared state ────────────────────────────────────────────────────────────
   const [session, setSession] = useState(null);
+  const gameKey = session?.game_type || urlGameKey || 'this_or_that';
   const [loading, setLoading] = useState(true);
   const [selectedOption, setSelectedOption] = useState(null);   // 'A'|'B'|'C'|'D' | 'truth'|'dare'
   const [lockedAnswer, setLockedAnswer] = useState(null);
@@ -632,23 +633,51 @@ export default function GameScreen() {
   };
 
   // ── Question text to display ─────────────────────────────────────────────────
-  const questionText =
-    gameKey === 'truth_or_dare'
-      ? question.truth  // show Truth as the "card title" before they pick
-      : question.text;
+  const questionText = question?.text || '';
+
+  // ── Confirm & go home mid-game ───────────────────────────────────────────────
+  const handleGoHome = () => {
+    const ok = window.confirm('Leave the game? Your progress on this question will not be saved.');
+    if (ok) navigate('/');
+  };
 
   // ── Main render ──────────────────────────────────────────────────────────────
   return (
     <div className="screen-container animate-fade-in" style={{ paddingBottom: '30px' }}>
       <div className="glass-card">
 
-        {/* Top Bar */}
+        {/* Top Bar — Home button + Stage + Level */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
-          <span className="badge-chip pink">
-            {question.stageEmoji || '🌸'} Stage {currentStage}: {stageName}
+          {/* Home button (left) */}
+          <button
+            type="button"
+            onClick={handleGoHome}
+            title="Go to Home"
+            style={{
+              background: 'rgba(255,255,255,0.7)',
+              border: '1.5px solid var(--color-glass-border)',
+              borderRadius: 'var(--radius-pill)',
+              padding: '5px 12px',
+              cursor: 'pointer',
+              fontSize: '0.82rem',
+              fontWeight: 700,
+              color: 'var(--color-warm-brown)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px',
+            }}
+          >
+            🏠 Home
+          </button>
+
+          {/* Stage chip (center) */}
+          <span className="badge-chip pink" style={{ fontSize: '0.75rem' }}>
+            {question?.stageEmoji || '🌸'} Stage {currentStage}: {stageName}
           </span>
-          <span className="badge-chip lavender" style={{ fontWeight: 800 }}>
-            {config.icon} Level {currentLevel} / 60
+
+          {/* Level chip (right) */}
+          <span className="badge-chip lavender" style={{ fontWeight: 800, fontSize: '0.75rem' }}>
+            {config.icon} {currentLevel}/60
           </span>
         </div>
 
@@ -686,7 +715,7 @@ export default function GameScreen() {
           </div>
         )}
 
-        {/* Mascot + Question */}
+        {/* Mascot + Question text */}
         <div style={{ textAlign: 'center', marginBottom: '22px' }}>
           <div className="animate-mascot-bob" style={{ marginBottom: '10px' }}>
             <LoveBug
@@ -695,12 +724,19 @@ export default function GameScreen() {
             />
           </div>
 
-          {/* For Truth or Dare: only show question text during pick phase */}
-          {gameKey !== 'truth_or_dare' || todPhase === 'pick' ? (
+          {/* Show question text for This or That & Know Me always.
+              For Truth or Dare: show a round header during pick phase only. */}
+          {gameKey === 'truth_or_dare' ? (
+            todPhase === 'pick' && !lockedAnswer ? (
+              <h2 style={{ fontSize: '1.15rem', lineHeight: 1.4, color: 'var(--color-warm-brown)' }}>
+                Round {currentLevel} — Choose your path! 🎭
+              </h2>
+            ) : null
+          ) : (
             <h2 style={{ fontSize: '1.2rem', lineHeight: 1.4, color: 'var(--color-warm-brown)' }}>
-              {gameKey === 'truth_or_dare' ? 'Ready for your next round?' : questionText}
+              {questionText}
             </h2>
-          ) : null}
+          )}
         </div>
 
         {/* ── GAME BODY ── */}

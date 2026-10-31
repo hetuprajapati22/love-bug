@@ -31,6 +31,31 @@ export const sessionService = {
   },
 
   /**
+   * Reset session to Level 1 waiting state so couple can start fresh together
+   */
+  async resetSession(sessionId) {
+    if (!supabase || !sessionId) return;
+    const { data, error } = await supabase
+      .from('game_sessions')
+      .update({
+        status: 'waiting',
+        partner_1_ready: true,
+        partner_2_ready: false,
+        current_level: 1,
+        current_stage: 1,
+      })
+      .eq('id', sessionId)
+      .select()
+      .maybeSingle();
+
+    if (error) {
+      console.error('Error resetting session:', error.message);
+      throw error;
+    }
+    return data;
+  },
+
+  /**
    * Fetch current session data
    */
   async getSession(sessionId) {
