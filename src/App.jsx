@@ -5,6 +5,8 @@ import Login from './pages/Login';
 import ProfileSetup from './pages/ProfileSetup';
 import CoupleRoom from './pages/CoupleRoom';
 import Dashboard from './pages/Dashboard';
+import Lobby from './pages/Lobby';
+import GameScreen from './pages/GameScreen';
 import DashboardDemo from './pages/DashboardDemo';
 import FloatingHearts from './components/ui/FloatingHearts';
 import LoveBug from './components/mascot/LoveBug';
@@ -75,6 +77,22 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <Dashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/lobby"
+              element={
+                <ProtectedRoute>
+                  <Lobby />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/play"
+              element={
+                <ProtectedRoute>
+                  <GameScreen />
                 </ProtectedRoute>
               }
             />

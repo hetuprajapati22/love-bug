@@ -177,7 +177,7 @@ export default function Dashboard() {
           type="button"
           disabled={!isCoupled}
           className="btn-pill-primary animate-pulse-subtle"
-          onClick={() => alert('Realtime Play Together lobby launches in Step 5!')}
+          onClick={() => navigate('/lobby?game=this_or_that')}
           style={{ fontSize: '1.08rem', padding: '15px 32px', marginBottom: '12px' }}
         >
           <span>Play Together 🐛💗</span>
@@ -220,7 +220,13 @@ export default function Dashboard() {
                 if (!isCoupled) {
                   navigate('/couple');
                 } else {
-                  alert(`${game.title} question screens start in Step 7!`);
+                  const gType =
+                    game.id === 'this-or-that'
+                      ? 'this_or_that'
+                      : game.id === 'know-me'
+                      ? 'know_me'
+                      : 'truth_or_dare';
+                  navigate(`/lobby?game=${gType}`);
                 }
               }}
             >
