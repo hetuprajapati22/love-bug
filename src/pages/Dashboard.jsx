@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { coupleService } from '../services/coupleService';
 import LoveBug from '../components/mascot/LoveBug';
+import StatsModal from '../components/ui/StatsModal';
 import { soundEffects } from '../utils/soundEffects';
 
 /**
@@ -15,6 +16,7 @@ export default function Dashboard() {
 
   const [mascotMood, setMascotMood] = useState('happy');
   const [unlinking, setUnlinking] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [muted, setMuted] = useState(soundEffects.isMuted());
 
   const handleToggleSound = () => {
@@ -147,7 +149,15 @@ export default function Dashboard() {
           </button>
 
           {isCoupled ? (
-            <div className="badge-chip pink" style={{ padding: '6px 12px', fontSize: '0.82rem' }}>
+            <div
+              className="badge-chip pink interactive-card"
+              onClick={() => {
+                soundEffects.playPop();
+                setShowStats(true);
+              }}
+              style={{ padding: '6px 12px', fontSize: '0.82rem', cursor: 'pointer' }}
+              title="View Couple Milestones & Stats"
+            >
               <span>🔥</span>
               <strong>1 Day</strong>
             </div>
@@ -363,6 +373,15 @@ export default function Dashboard() {
           Log Out
         </button>
       </div>
+
+      {/* Couple Milestones & Achievements Modal */}
+      <StatsModal
+        isOpen={showStats}
+        onClose={() => setShowStats(false)}
+        myPetName={profile?.pet_name || 'You'}
+        partnerPetName={couple?.partner_pet_name || 'Partner'}
+        onEditProfile={() => navigate('/setup')}
+      />
     </div>
   );
 }

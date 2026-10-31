@@ -4,6 +4,7 @@ import { useAuth } from '../hooks/useAuth';
 import { sessionService } from '../services/sessionService';
 import { supabase } from '../lib/supabaseClient';
 import LoveBug from '../components/mascot/LoveBug';
+import HeartConfetti from '../components/ui/HeartConfetti';
 import { soundEffects } from '../utils/soundEffects';
 
 // ── Question sets ─────────────────────────────────────────────────────────────
@@ -297,7 +298,8 @@ export default function GameScreen() {
     const partnerLabel = session?.is_partner_1 ? partnerPetName : myPetName;
 
     return (
-      <div className="animate-fade-in" style={{ textAlign: 'center' }}>
+      <div className="animate-fade-in" style={{ textAlign: 'center', position: 'relative' }}>
+        {showMatch && <HeartConfetti />}
         {/* Match Banner */}
         <div
           style={{
@@ -733,6 +735,17 @@ export default function GameScreen() {
               size={80}
             />
           </div>
+
+          {/* For Know Me: highlight whose question it is */}
+          {gameKey === 'know_me' && (
+            <div style={{ marginBottom: '8px' }}>
+              <span className="badge-chip lavender" style={{ fontSize: '0.76rem', fontWeight: 700 }}>
+                {currentLevel % 2 !== 0
+                  ? `🎯 All about ${partnerPetName} — can you guess?`
+                  : `🎯 All about ${myPetName} — answer truthfully!`}
+              </span>
+            </div>
+          )}
 
           {/* Show question text for This or That & Know Me always.
               For Truth or Dare: show a round header during pick phase only. */}
