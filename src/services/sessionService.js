@@ -93,18 +93,27 @@ export const sessionService = {
   },
 
   /**
-   * Check if both partners have answered (bypasses RLS recursion via security definer RPC)
+   * Check if both partners have answered (read-only — never overwrites answers)
    */
-  async checkRevealStatus(sessionId, levelNumber, lockedAnswer) {
-    if (!supabase || !sessionId || !lockedAnswer) return null;
+  async checkRevealStatus(sessionId, levelNumber) {
+    if (!supabase || !sessionId) return null;
     try {
-      const { data, error } = await supabase.rpc('submit_level_answer', {
-        p_session_id: sessionId,
-        p_level_number: levelNumber,
-        p_answer: lockedAnswer,
-      });
-      if (error) return null;
-      return data;
+      // Read answers directly — RLS allows reading both answers once count >= 2
+      const { data: answers, error } = await supabase
+        .from('session_answers')
+        .select('user_id, answer')
+        .eq('session_id', sessionId)
+        .eq('level_number', levelNumber);
+
+      if (error || !answers) return null;
+
+      const bothAnswered = answers.length >= 2;
+      if (!bothAnswered) return { both_answered: false };
+
+      return {
+        both_answered: true,
+        answers, // array of { user_id, answer }
+      };
     } catch {
       return null;
     }

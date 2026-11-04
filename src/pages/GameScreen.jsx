@@ -117,10 +117,12 @@ export default function GameScreen() {
         // Restore ToD phase if already done
         if (gameKey === 'truth_or_dare') setTodPhase('doing');
 
-        // Check if both have answered via security-definer RPC (bypasses RLS)
-        const check = await sessionService.checkRevealStatus(sessionId, sess.current_level, myAns.answer);
-        if (check?.both_answered) {
-          setRevealData({ partner_1_answer: check.partner_1_answer, partner_2_answer: check.partner_2_answer });
+        // Check if both have answered (read-only, no UPSERT)
+        const check = await sessionService.checkRevealStatus(sessionId, sess.current_level);
+        if (check?.both_answered && check.answers) {
+          const myReveal = check.answers.find((a) => a.user_id === user?.id);
+          const partnerReveal = check.answers.find((a) => a.user_id !== user?.id);
+          setRevealData({ my_answer: myReveal?.answer, partner_answer: partnerReveal?.answer });
           setRevealed(true);
         } else {
           setRevealed(false);
@@ -155,12 +157,14 @@ export default function GameScreen() {
     syncChannel
       .on('broadcast', { event: 'reveal_answers' }, ({ payload }) => {
         // Partner answered second, revealing both simultaneously!
+        // payload contains: my_user_id, my_answer, partner_answer (from sender's perspective)
+        // For the RECEIVER, sender's "my" is our "partner" and vice versa
         setRevealData({
-          partner_1_answer: payload.partner_1_answer,
-          partner_2_answer: payload.partner_2_answer,
+          my_answer: payload.partner_answer,      // sender's partner = us
+          partner_answer: payload.my_answer,       // sender's my = our partner
         });
         setRevealed(true);
-        if (payload.partner_1_answer?.choice === payload.partner_2_answer?.choice) {
+        if (payload.my_answer?.choice === payload.partner_answer?.choice) {
           soundEffects.playMatch();
         } else {
           soundEffects.playPop();
@@ -170,7 +174,7 @@ export default function GameScreen() {
         // Partner locked their answer, recheck state
         loadSessionState();
       })
-      .on('broadcast', { event: 'level_advanced' }, (payload) => {
+      .on('broadcast', { event: 'level_advanced' }, ({ payload }) => {
         // Partner pressed "Next Question", advance both immediately!
         soundEffects.playPop();
         const nextLevel = payload.newLevel;
@@ -270,16 +274,18 @@ export default function GameScreen() {
           }
         }
 
-        // 2. If locked answer is waiting for partner, verify via Security-Definer RPC (bypasses RLS limits)
+        // 2. If locked answer is waiting for partner, verify via read-only check
         if (lockedAnswer && !revealed) {
-          const check = await sessionService.checkRevealStatus(sessionId, activeLevel, lockedAnswer);
-          if (check?.both_answered) {
+          const check = await sessionService.checkRevealStatus(sessionId, activeLevel);
+          if (check?.both_answered && check.answers) {
+            const myReveal = check.answers.find((a) => a.user_id === user?.id);
+            const partnerReveal = check.answers.find((a) => a.user_id !== user?.id);
             setRevealData({
-              partner_1_answer: check.partner_1_answer,
-              partner_2_answer: check.partner_2_answer,
+              my_answer: myReveal?.answer,
+              partner_answer: partnerReveal?.answer,
             });
             setRevealed(true);
-            if (check.partner_1_answer?.choice === check.partner_2_answer?.choice) {
+            if (myReveal?.answer?.choice === partnerReveal?.answer?.choice) {
               soundEffects.playMatch();
             } else {
               soundEffects.playPop();
@@ -336,22 +342,32 @@ export default function GameScreen() {
       });
 
       soundEffects.playLock();
-      setLockedAnswer({ choice: selectedOption, text });
+      const myAnswer = { choice: selectedOption, text };
+      setLockedAnswer(myAnswer);
 
       if (res.both_answered) {
-        setRevealData({ partner_1_answer: res.partner_1_answer, partner_2_answer: res.partner_2_answer });
+        // RPC returns partner_1_answer / partner_2_answer (by DB partner order)
+        // Map to my_answer / partner_answer by checking which one matches our submission
+        const p1 = res.partner_1_answer;
+        const p2 = res.partner_2_answer;
+        const isP1 = session?.partner_1_id === user?.id;
+        const myRevealAnswer = isP1 ? p1 : p2;
+        const partnerRevealAnswer = isP1 ? p2 : p1;
+
+        setRevealData({ my_answer: myRevealAnswer, partner_answer: partnerRevealAnswer });
         setRevealed(true);
-        if (res.partner_1_answer?.choice === res.partner_2_answer?.choice) {
+        if (myRevealAnswer?.choice === partnerRevealAnswer?.choice) {
           soundEffects.playMatch();
         } else {
           soundEffects.playPop();
         }
 
         // Instant broadcast simultaneous reveal to partner
+        // NOTE: We send OUR perspective; receiver flips my/partner
         broadcastSync('reveal_answers', {
           level: currentLevel,
-          partner_1_answer: res.partner_1_answer,
-          partner_2_answer: res.partner_2_answer,
+          my_answer: myRevealAnswer,
+          partner_answer: partnerRevealAnswer,
         });
       } else {
         // Broadcast that this partner locked their answer
@@ -383,18 +399,25 @@ export default function GameScreen() {
       });
 
       soundEffects.playLock();
-      setLockedAnswer({ choice: chosenType, text: chosenText });
+      const myAnswer = { choice: chosenType, text: chosenText };
+      setLockedAnswer(myAnswer);
 
       if (res.both_answered) {
-        setRevealData({ partner_1_answer: res.partner_1_answer, partner_2_answer: res.partner_2_answer });
+        const p1 = res.partner_1_answer;
+        const p2 = res.partner_2_answer;
+        const isP1 = session?.partner_1_id === user?.id;
+        const myRevealAnswer = isP1 ? p1 : p2;
+        const partnerRevealAnswer = isP1 ? p2 : p1;
+
+        setRevealData({ my_answer: myRevealAnswer, partner_answer: partnerRevealAnswer });
         setRevealed(true);
         soundEffects.playMatch();
 
         // Instant broadcast simultaneous reveal to partner
         broadcastSync('reveal_answers', {
           level: currentLevel,
-          partner_1_answer: res.partner_1_answer,
-          partner_2_answer: res.partner_2_answer,
+          my_answer: myRevealAnswer,
+          partner_answer: partnerRevealAnswer,
         });
       } else {
         // Broadcast that this partner completed their turn
@@ -471,21 +494,16 @@ export default function GameScreen() {
   // ── Is this a match? (for This or That / Know Me) ───────────────────────────
   const isMatch =
     revealed &&
-    revealData?.partner_1_answer?.choice === revealData?.partner_2_answer?.choice;
+    revealData?.my_answer?.choice === revealData?.partner_answer?.choice;
 
   // ── REVEAL PANEL (shared across all game types) ──────────────────────────────
   const renderReveal = () => {
-    const p1Ans = revealData?.partner_1_answer;
-    const p2Ans = revealData?.partner_2_answer;
+    const myAns = revealData?.my_answer;
+    const partnerAns = revealData?.partner_answer;
 
     // For Truth or Dare: match = both picked the same (truth/truth or dare/dare)
-    const todMatch = gameKey === 'truth_or_dare' && p1Ans?.choice === p2Ans?.choice;
+    const todMatch = gameKey === 'truth_or_dare' && myAns?.choice === partnerAns?.choice;
     const showMatch = gameKey === 'truth_or_dare' ? todMatch : isMatch;
-
-    // Correctly determine who is Partner 1 based on partner_1_id
-    const isP1 = session?.partner_1_id ? session.partner_1_id === user?.id : Boolean(session?.is_partner_1);
-    const myLabel = isP1 ? myPetName : partnerPetName;
-    const partnerLabel = isP1 ? partnerPetName : myPetName;
 
     return (
       <div className="animate-fade-in" style={{ textAlign: 'center', position: 'relative' }}>
@@ -516,49 +534,49 @@ export default function GameScreen() {
           </p>
         </div>
 
-        {/* Revealed Answers */}
+        {/* Revealed Answers — always "You" on left, "Partner" on right */}
         <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-          {/* Partner 1 */}
+          {/* YOUR answer */}
           <div
             style={{
               flex: 1, padding: '14px', borderRadius: 'var(--radius-md)',
-              background: 'rgba(255, 255, 255, 0.9)',
-              border: '1.5px solid var(--color-glass-border)',
+              background: 'rgba(248, 201, 216, 0.25)',
+              border: '1.5px solid var(--color-muted-rose)',
               textAlign: 'left',
             }}
           >
             <div style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)', fontWeight: 700, marginBottom: '4px' }}>
-              {isP1 ? myLabel : partnerLabel}
+              {myPetName} (You)
             </div>
             {gameKey === 'truth_or_dare' && (
               <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--color-deep-rose)', marginBottom: '4px' }}>
-                {p1Ans?.choice === 'truth' ? '🌸 Truth' : '🔥 Dare'}
+                {myAns?.choice === 'truth' ? '🌸 Truth' : '🔥 Dare'}
               </div>
             )}
             <div style={{ fontSize: '0.88rem', fontWeight: 700, lineHeight: 1.4 }}>
-              {p1Ans?.text}
+              {myAns?.text}
             </div>
           </div>
 
-          {/* Partner 2 */}
+          {/* PARTNER'S answer */}
           <div
             style={{
               flex: 1, padding: '14px', borderRadius: 'var(--radius-md)',
-              background: 'rgba(255, 255, 255, 0.9)',
+              background: 'rgba(220, 212, 247, 0.25)',
               border: '1.5px solid var(--color-glass-border)',
               textAlign: 'left',
             }}
           >
             <div style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)', fontWeight: 700, marginBottom: '4px' }}>
-              {isP1 ? partnerLabel : myLabel}
+              {partnerPetName}
             </div>
             {gameKey === 'truth_or_dare' && (
               <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--color-deep-rose)', marginBottom: '4px' }}>
-                {p2Ans?.choice === 'truth' ? '🌸 Truth' : '🔥 Dare'}
+                {partnerAns?.choice === 'truth' ? '🌸 Truth' : '🔥 Dare'}
               </div>
             )}
             <div style={{ fontSize: '0.88rem', fontWeight: 700, lineHeight: 1.4 }}>
-              {p2Ans?.text}
+              {partnerAns?.text}
             </div>
           </div>
         </div>
