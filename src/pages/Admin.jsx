@@ -28,6 +28,7 @@ export default function Admin() {
   const [searchFilter, setSearchFilter] = useState('');
   const [statusMsg, setStatusMsg] = useState('');
   const [resetting, setResetting] = useState(false);
+  const [showUnlinkedSide, setShowUnlinkedSide] = useState(true);
 
   // Authorized emails list
   const ADMIN_EMAILS = ['hetu2286@gmail.com', 'hetuprajapati22@gmail.com'];
@@ -96,8 +97,24 @@ export default function Admin() {
     }
   };
 
-  // Filter couples
-  const filteredCouples = (data.couples || []).filter((c) => {
+  // Split couples into Active and Unlinked
+  const activeCouples = (data.couples || []).filter((c) => c.status === 'active');
+  const unlinkedCouples = (data.couples || []).filter((c) => c.status !== 'active');
+
+  // Filter Active Couples
+  const filteredActiveCouples = activeCouples.filter((c) => {
+    if (!searchFilter.trim()) return true;
+    const q = searchFilter.toLowerCase();
+    return (
+      (c.partner_1_pet && c.partner_1_pet.toLowerCase().includes(q)) ||
+      (c.partner_2_pet && c.partner_2_pet.toLowerCase().includes(q)) ||
+      (c.partner_1_name && c.partner_1_name.toLowerCase().includes(q)) ||
+      (c.partner_2_name && c.partner_2_name.toLowerCase().includes(q))
+    );
+  });
+
+  // Filter Unlinked Couples
+  const filteredUnlinkedCouples = unlinkedCouples.filter((c) => {
     if (!searchFilter.trim()) return true;
     const q = searchFilter.toLowerCase();
     return (
@@ -175,7 +192,7 @@ export default function Admin() {
   }
 
   return (
-    <div className="screen-container animate-fade-in" style={{ paddingBottom: '60px' }}>
+    <div className="screen-container animate-fade-in" style={{ maxWidth: '820px', width: '100%', paddingBottom: '60px' }}>
       {/* Header Bar */}
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
         <button
@@ -227,16 +244,16 @@ export default function Admin() {
             style={{
               padding: '12px 6px',
               borderRadius: 'var(--radius-md)',
-              background: 'rgba(220, 212, 247, 0.45)',
+              background: 'rgba(201, 220, 203, 0.55)',
               border: '1px solid var(--color-glass-border)',
             }}
           >
             <div style={{ fontSize: '1.4rem' }}>💑</div>
             <div style={{ fontSize: '1.3rem', fontWeight: 900, color: 'var(--color-warm-brown)' }}>
-              {data.total_couples}
+              {activeCouples.length}
             </div>
             <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--color-warm-brown-light)' }}>
-              Couples Paired
+              Active Couples ({unlinkedCouples.length} unlinked)
             </div>
           </div>
 
@@ -244,7 +261,7 @@ export default function Admin() {
             style={{
               padding: '12px 6px',
               borderRadius: 'var(--radius-md)',
-              background: 'rgba(201, 220, 203, 0.45)',
+              background: 'rgba(220, 212, 247, 0.45)',
               border: '1px solid var(--color-glass-border)',
             }}
           >
@@ -285,7 +302,7 @@ export default function Admin() {
             setActiveTab('couples');
             soundEffects.playPop();
           }}
-          className={`badge-chip ${activeTab === 'couples' ? 'pink' : ''}`}
+          className={`badge-chip ${activeTab === 'couples' ? 'sage' : ''}`}
           style={{
             flex: 1,
             padding: '8px',
@@ -293,10 +310,10 @@ export default function Admin() {
             fontWeight: 800,
             cursor: 'pointer',
             textAlign: 'center',
-            border: activeTab === 'couples' ? '1.5px solid var(--color-deep-rose)' : '1px solid var(--color-glass-border)',
+            border: activeTab === 'couples' ? '1.5px solid #2D6A4F' : '1px solid var(--color-glass-border)',
           }}
         >
-          💑 All Couples ({data.couples?.length || 0})
+          💑 Active Couples ({activeCouples.length})
         </button>
 
         <button
@@ -326,7 +343,7 @@ export default function Admin() {
           type="text"
           value={searchFilter}
           onChange={(e) => setSearchFilter(e.target.value)}
-          placeholder={`🔍 Search ${activeTab === 'couples' ? 'couples by pet name...' : 'game sessions by player...'}`}
+          placeholder={`🔍 Search ${activeTab === 'couples' ? 'couples by pet name or full name...' : 'game sessions by player...'}`}
           style={{
             width: '100%',
             padding: '9px 16px',
@@ -339,57 +356,210 @@ export default function Admin() {
         />
       </div>
 
-      {/* TAB 1: ALL COUPLES LIST */}
+      {/* TAB 1: ACTIVE COUPLES MAIN + UNLINKED COUPLES SIDE */}
       {activeTab === 'couples' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          {filteredCouples.length === 0 ? (
-            <div className="glass-card" style={{ textAlign: 'center', padding: '24px', opacity: 0.7 }}>
-              <p style={{ margin: 0, fontSize: '0.86rem' }}>No couples found matching your search.</p>
-            </div>
-          ) : (
-            filteredCouples.map((c, i) => (
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+            gap: '16px',
+            alignItems: 'start',
+          }}
+        >
+          {/* MAIN SECTION: ONLY ACTIVE COUPLES */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '2px 6px',
+              }}
+            >
               <div
-                key={c.id || i}
-                className="glass-card"
                 style={{
-                  padding: '14px 16px',
-                  background: 'rgba(255, 255, 255, 0.95)',
-                  border: '1.5px solid var(--color-glass-border)',
+                  fontSize: '0.92rem',
+                  fontWeight: 900,
+                  color: 'var(--color-warm-brown)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
                 }}
               >
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
-                  <span className={`badge-chip ${c.status === 'active' ? 'sage' : 'pink'}`} style={{ fontSize: '0.72rem' }}>
-                    {c.status === 'active' ? '✓ Active Couple' : 'Unlinked'}
-                  </span>
-                  <span style={{ fontSize: '0.72rem', color: 'var(--color-warm-brown-light)' }}>
-                    {c.created_at ? new Date(c.created_at).toLocaleDateString() : 'Recent'}
-                  </span>
-                </div>
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <div style={{ flex: 1 }}>
-                    <div style={{ fontSize: '0.94rem', fontWeight: 800, color: 'var(--color-warm-brown)' }}>
-                      {c.partner_1_pet || c.partner_1_name || 'Partner 1'}
-                    </div>
-                    <div style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)' }}>
-                      {c.partner_1_name}
-                    </div>
-                  </div>
-
-                  <span style={{ fontSize: '1.2rem' }}>❤️</span>
-
-                  <div style={{ flex: 1, textAlign: 'right' }}>
-                    <div style={{ fontSize: '0.94rem', fontWeight: 800, color: 'var(--color-warm-brown)' }}>
-                      {c.partner_2_pet || c.partner_2_name || 'Partner 2'}
-                    </div>
-                    <div style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)' }}>
-                      {c.partner_2_name}
-                    </div>
-                  </div>
-                </div>
+                <span>🟢 Active Couples</span>
+                <span
+                  style={{
+                    background: '#2D6A4F',
+                    color: '#fff',
+                    borderRadius: 'var(--radius-pill)',
+                    padding: '2px 8px',
+                    fontSize: '0.72rem',
+                    fontWeight: 900,
+                  }}
+                >
+                  {filteredActiveCouples.length}
+                </span>
               </div>
-            ))
-          )}
+              <span style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)' }}>
+                Currently Paired
+              </span>
+            </div>
+
+            {filteredActiveCouples.length === 0 ? (
+              <div className="glass-card" style={{ textAlign: 'center', padding: '24px', opacity: 0.7 }}>
+                <p style={{ margin: 0, fontSize: '0.86rem' }}>No active couples found matching your search.</p>
+              </div>
+            ) : (
+              filteredActiveCouples.map((c, i) => (
+                <div
+                  key={c.id || i}
+                  className="glass-card"
+                  style={{
+                    padding: '14px 16px',
+                    background: 'rgba(255, 255, 255, 0.98)',
+                    border: '1.5px solid rgba(45, 106, 79, 0.28)',
+                    boxShadow: '0 4px 14px rgba(45, 106, 79, 0.08)',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span className="badge-chip sage" style={{ fontSize: '0.72rem', fontWeight: 800 }}>
+                      ✓ Active Couple
+                    </span>
+                    <span style={{ fontSize: '0.72rem', color: 'var(--color-warm-brown-light)' }}>
+                      Paired: {c.created_at ? new Date(c.created_at).toLocaleDateString() : 'Recent'}
+                    </span>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: '0.96rem', fontWeight: 900, color: 'var(--color-warm-brown)' }}>
+                        {c.partner_1_pet || c.partner_1_name || 'Partner 1'}
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)' }}>
+                        {c.partner_1_name}
+                      </div>
+                    </div>
+
+                    <span style={{ fontSize: '1.25rem' }}>💖</span>
+
+                    <div style={{ flex: 1, textAlign: 'right' }}>
+                      <div style={{ fontSize: '0.96rem', fontWeight: 900, color: 'var(--color-warm-brown)' }}>
+                        {c.partner_2_pet || c.partner_2_name || 'Partner 2'}
+                      </div>
+                      <div style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)' }}>
+                        {c.partner_2_name}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* SIDE SECTION: UNLINKED COUPLES */}
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '10px',
+              padding: '14px',
+              borderRadius: 'var(--radius-xl)',
+              background: 'rgba(255, 245, 245, 0.75)',
+              border: '1.5px dashed rgba(200, 150, 160, 0.45)',
+            }}
+          >
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '2px 4px',
+              }}
+            >
+              <div
+                style={{
+                  fontSize: '0.88rem',
+                  fontWeight: 900,
+                  color: '#8A5D65',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                }}
+              >
+                <span>💔 Unlinked Couples (Side)</span>
+                <span
+                  style={{
+                    background: '#9E2A2B',
+                    color: '#fff',
+                    borderRadius: 'var(--radius-pill)',
+                    padding: '2px 7px',
+                    fontSize: '0.7rem',
+                    fontWeight: 800,
+                  }}
+                >
+                  {filteredUnlinkedCouples.length}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowUnlinkedSide((prev) => !prev)}
+                className="btn-pill-secondary"
+                style={{ fontSize: '0.72rem', padding: '3px 10px', width: 'auto' }}
+              >
+                {showUnlinkedSide ? 'Hide' : 'Show'}
+              </button>
+            </div>
+
+            {showUnlinkedSide && (
+              filteredUnlinkedCouples.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '16px', opacity: 0.6 }}>
+                  <p style={{ margin: 0, fontSize: '0.8rem' }}>No unlinked couples.</p>
+                </div>
+              ) : (
+                filteredUnlinkedCouples.map((c, i) => (
+                  <div
+                    key={c.id || i}
+                    style={{
+                      padding: '10px 12px',
+                      borderRadius: 'var(--radius-md)',
+                      background: 'rgba(255, 255, 255, 0.9)',
+                      border: '1px solid rgba(217, 133, 163, 0.2)',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <span
+                        style={{
+                          fontSize: '0.66rem',
+                          fontWeight: 800,
+                          color: '#8A5D65',
+                          background: 'rgba(217, 133, 163, 0.15)',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                        }}
+                      >
+                        Unlinked
+                      </span>
+                      <span style={{ fontSize: '0.68rem', color: '#999' }}>
+                        {c.created_at ? new Date(c.created_at).toLocaleDateString() : ''}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '0.84rem' }}>
+                      <div>
+                        <strong style={{ color: 'var(--color-warm-brown)' }}>{c.partner_1_pet || c.partner_1_name}</strong>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--color-warm-brown-light)' }}>{c.partner_1_name}</div>
+                      </div>
+                      <span style={{ color: '#bbb', margin: '0 6px' }}>✕</span>
+                      <div style={{ textAlign: 'right' }}>
+                        <strong style={{ color: 'var(--color-warm-brown)' }}>{c.partner_2_pet || c.partner_2_name}</strong>
+                        <div style={{ fontSize: '0.68rem', color: 'var(--color-warm-brown-light)' }}>{c.partner_2_name}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )
+            )}
+          </div>
         </div>
       )}
 
