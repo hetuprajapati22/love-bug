@@ -88,16 +88,24 @@ export default function CoupleChat() {
   const inputRef = useRef(null);
 
   const channelRef = useRef(null);
+  const [partnerOnline, setPartnerOnline] = useState(false);
 
-  // Real-time Supabase Broadcast channel for Instant Partner Chat & Read Receipts
+  // Refs so broadcast callbacks always see latest values (no stale closure)
+  const isOpenRef = useRef(isOpen);
+  const activeTabRef = useRef(activeTab);
+  useEffect(() => { isOpenRef.current = isOpen; }, [isOpen]);
+  useEffect(() => { activeTabRef.current = activeTab; }, [activeTab]);
+
+  // ── Real-time Supabase Channel: Chat + Read Receipts + Presence ──────────
   useEffect(() => {
-    if (!coupleId || !supabase) return;
+    if (!coupleId || !supabase || !user?.id) return;
 
     const channel = supabase.channel(`couple_chat_${coupleId}`, {
-      config: { broadcast: { self: false } },
+      config: { broadcast: { self: false }, presence: { key: user.id } },
     });
 
     channel
+      // ── Incoming Messages ──
       .on('broadcast', { event: 'new_message' }, ({ payload }) => {
         const incoming = {
           ...payload,
@@ -108,82 +116,99 @@ export default function CoupleChat() {
           return [...prev, incoming];
         });
         soundEffects.playMessage();
-        if (!isOpen) {
+        if (!isOpenRef.current) {
           setUnreadCount((c) => c + 1);
         }
 
-        // Acknowledge delivery
-        try {
+        // Tell sender we received their message (delivered ✓✓)
+        channel.send({
+          type: 'broadcast',
+          event: 'message_delivered',
+          payload: { messageId: incoming.id, by: user.id },
+        }).catch(() => {});
+
+        // If chat is open, also tell sender we read it (seen ✓✓ pink)
+        if (isOpenRef.current && activeTabRef.current === 'partner') {
           channel.send({
             type: 'broadcast',
-            event: 'message_delivered',
-            payload: { messageId: incoming.id },
-          });
-          // If chat window is already open, acknowledge read immediately
-          if (isOpen) {
-            channel.send({
-              type: 'broadcast',
-              event: 'messages_read',
-              payload: { messageId: incoming.id },
-            });
-          }
-        } catch (_) {}
+            event: 'messages_read',
+            payload: { upTo: incoming.id, by: user.id },
+          }).catch(() => {});
+        }
       })
+
+      // ── Delivery Confirmation (only from PARTNER, never from self) ──
       .on('broadcast', { event: 'message_delivered' }, ({ payload }) => {
-        // Mark message as delivered (double check ✓✓)
+        // Only process if partner sent this (not ourselves)
+        if (payload.by === user.id) return;
         setPartnerMessages((prev) =>
           prev.map((m) =>
-            m.id === payload.messageId || String(m.id) === String(payload.messageId)
+            m.senderId === user.id && (m.id === payload.messageId || String(m.id) === String(payload.messageId))
               ? { ...m, delivered: true }
               : m
           )
         );
       })
+
+      // ── Read Confirmation (only from PARTNER, never from self) ──
       .on('broadcast', { event: 'messages_read' }, ({ payload }) => {
-        // Mark messages as read by sweetheart (pink double check ✓✓)
+        if (payload.by === user.id) return;
         setPartnerMessages((prev) =>
           prev.map((m) => {
-            if (m.senderId === user?.id) {
-              if (!payload.messageId || String(m.id) <= String(payload.messageId)) {
-                return { ...m, delivered: true, read: true };
-              }
+            if (m.senderId === user.id) {
+              return { ...m, delivered: true, read: true };
             }
             return m;
           })
         );
       })
-      .subscribe((status) => {
+
+      // ── Presence: Track Partner Online/Offline ──
+      .on('presence', { event: 'sync' }, () => {
+        const state = channel.presenceState();
+        const keys = Object.keys(state);
+        // Partner is online if any key other than ours is present
+        const online = keys.some((k) => k !== user.id);
+        setPartnerOnline(online);
+      })
+      .on('presence', { event: 'join' }, ({ key }) => {
+        if (key !== user.id) setPartnerOnline(true);
+      })
+      .on('presence', { event: 'leave' }, ({ key }) => {
+        if (key !== user.id) setPartnerOnline(false);
+      })
+
+      .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
           channelRef.current = channel;
-          // When connected, if chat is open, broadcast that messages are read
-          if (isOpen && activeTab === 'partner') {
-            channel.send({
-              type: 'broadcast',
-              event: 'messages_read',
-              payload: { messageId: Date.now() },
-            }).catch(() => {});
-          }
+          // Track our own presence
+          await channel.track({ online_at: new Date().toISOString() });
         }
       });
 
     return () => {
+      channel.untrack().catch(() => {});
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
-  }, [coupleId, isOpen, activeTab, user?.id]);
+  }, [coupleId, user?.id]);
+  // NOTE: isOpen / activeTab deliberately NOT in deps to avoid channel re-creation
 
-  // When opening the chat modal or switching to partner tab, mark partner's messages as read
+  // ── When user opens chat or switches to partner tab, send read receipt ──
   useEffect(() => {
-    if (isOpen && activeTab === 'partner' && channelRef.current) {
-      try {
+    if (isOpen && activeTab === 'partner' && channelRef.current && user?.id) {
+      // Check if there are any unread partner messages
+      const hasUnread = partnerMessages.some((m) => m.senderId !== user.id);
+      if (hasUnread) {
         channelRef.current.send({
           type: 'broadcast',
           event: 'messages_read',
-          payload: { messageId: Date.now() },
-        });
-      } catch (_) {}
+          payload: { upTo: Date.now(), by: user.id },
+        }).catch(() => {});
+      }
+      setUnreadCount(0);
     }
-  }, [isOpen, activeTab]);
+  }, [isOpen, activeTab, user?.id, partnerMessages.length]);
 
   // Auto-scroll
   useEffect(() => {
@@ -343,6 +368,21 @@ export default function CoupleChat() {
           <span style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--color-warm-brown)' }}>
             {isCoupled ? `Chat with ${partnerPetName}` : 'Love Bug Chat'} 💬
           </span>
+          {/* Partner online status dot */}
+          <span
+            style={{
+              display: 'inline-block',
+              width: '9px',
+              height: '9px',
+              borderRadius: '50%',
+              background: partnerOnline ? '#22c55e' : '#aaa',
+              border: '2px solid #fff',
+              boxShadow: partnerOnline ? '0 0 6px #22c55e' : 'none',
+              transition: 'all 0.3s ease',
+              marginLeft: '-4px',
+            }}
+            title={partnerOnline ? `${partnerPetName} is Online` : `${partnerPetName} is Offline`}
+          />
           {unreadCount > 0 && (
             <span
               style={{
@@ -396,7 +436,7 @@ export default function CoupleChat() {
             }}
           >
             {/* Tabs */}
-            <div style={{ display: 'flex', gap: '6px' }}>
+            <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
               <button
                 type="button"
                 onClick={() => {
@@ -412,6 +452,19 @@ export default function CoupleChat() {
                 }}
               >
                 💬 {partnerPetName}
+                <span
+                  style={{
+                    display: 'inline-block',
+                    width: '8px',
+                    height: '8px',
+                    borderRadius: '50%',
+                    background: partnerOnline ? '#22c55e' : '#aaa',
+                    marginLeft: '4px',
+                    boxShadow: partnerOnline ? '0 0 6px #22c55e' : 'none',
+                    transition: 'all 0.3s ease',
+                  }}
+                  title={partnerOnline ? 'Online' : 'Offline'}
+                />
               </button>
 
               <button
@@ -432,8 +485,35 @@ export default function CoupleChat() {
               </button>
             </div>
 
-            {/* Close Button */}
-            <button
+            {/* Partner Online Status (visible in partner tab) */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {activeTab === 'partner' && (
+                <span
+                  style={{
+                    fontSize: '0.68rem',
+                    fontWeight: 700,
+                    color: partnerOnline ? '#16a34a' : '#999',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                  }}
+                >
+                  <span
+                    style={{
+                      display: 'inline-block',
+                      width: '7px',
+                      height: '7px',
+                      borderRadius: '50%',
+                      background: partnerOnline ? '#22c55e' : '#ccc',
+                      boxShadow: partnerOnline ? '0 0 5px #22c55e' : 'none',
+                    }}
+                  />
+                  {partnerOnline ? 'Online' : 'Offline'}
+                </span>
+              )}
+
+              {/* Close Button */}
+              <button
               type="button"
               onClick={() => {
                 setIsOpen(false);
@@ -454,7 +534,8 @@ export default function CoupleChat() {
               }}
             >
               ✕
-            </button>
+              </button>
+            </div>
           </div>
 
           {/* Quick Love Stickers (for partner chat) */}
