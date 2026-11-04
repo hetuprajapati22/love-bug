@@ -192,7 +192,7 @@ export default function CoupleChat() {
           style={{
             position: 'fixed',
             bottom: '20px',
-            right: '20px',
+            left: '20px',
             zIndex: 9999,
             background: 'linear-gradient(135deg, #F8C9D8, #DCD4F7)',
             border: '2px solid rgba(255, 255, 255, 0.8)',
@@ -234,7 +234,7 @@ export default function CoupleChat() {
           style={{
             position: 'fixed',
             bottom: '20px',
-            right: '20px',
+            left: '20px',
             width: 'calc(100vw - 40px)',
             maxWidth: '380px',
             height: '520px',
