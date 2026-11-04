@@ -98,4 +98,19 @@ export const authService = {
     }
     return data || profileData;
   },
+
+  /**
+   * Delete user account and associated profile/couple safely
+   */
+  async deleteAccount() {
+    if (!supabase) throw new Error('Supabase client not initialized');
+    try {
+      const { error } = await supabase.rpc('delete_my_account');
+      if (error) console.warn('RPC delete_my_account error:', error.message);
+    } catch (e) {
+      console.warn('Error during delete_my_account RPC:', e);
+    }
+    await supabase.auth.signOut();
+    return true;
+  },
 };

@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { coupleService } from '../services/coupleService';
+import { authService } from '../services/authService';
 import LoveBug from '../components/mascot/LoveBug';
 import { soundEffects } from '../utils/soundEffects';
 
@@ -22,6 +23,31 @@ export default function Settings() {
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [unlinking, setUnlinking] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    const confirm1 = window.confirm(
+      'WARNING: Are you sure you want to permanently delete your Love Bug account? All your game answers and profile will be deleted.'
+    );
+    if (!confirm1) return;
+
+    const confirm2 = window.prompt('To confirm deletion, please type "DELETE" below:');
+    if (confirm2 !== 'DELETE') {
+      alert('Account deletion canceled.');
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      await authService.deleteAccount();
+      alert('Your account has been deleted. We hope to see you again!');
+      navigate('/login');
+    } catch (err) {
+      alert(err.message || 'Could not delete account.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const colorPresets = [
     { name: 'Blush Pink', hex: '#F8C9D8' },
@@ -333,16 +359,88 @@ export default function Settings() {
         <span>➔</span>
       </div>
 
-      {/* Account Logout */}
-      <div style={{ textAlign: 'center' }}>
+      {/* History & Legal Navigation Links */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+        <button
+          type="button"
+          onClick={() => {
+            soundEffects.playPop();
+            navigate('/history');
+          }}
+          className="glass-card interactive-card"
+          style={{ padding: '14px 10px', textAlign: 'center', cursor: 'pointer' }}
+        >
+          <div style={{ fontSize: '1.4rem', marginBottom: '2px' }}>📜</div>
+          <div style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--color-warm-brown)' }}>
+            Game History
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            soundEffects.playPop();
+            navigate('/privacy');
+          }}
+          className="glass-card interactive-card"
+          style={{ padding: '14px 10px', textAlign: 'center', cursor: 'pointer' }}
+        >
+          <div style={{ fontSize: '1.4rem', marginBottom: '2px' }}>⚖️</div>
+          <div style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--color-warm-brown)' }}>
+            Privacy & Terms
+          </div>
+        </button>
+      </div>
+
+      {/* Account Actions: Logout & Delete */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center' }}>
         <button
           type="button"
           className="btn-pill-secondary"
           onClick={signOut}
-          style={{ width: 'auto', padding: '8px 24px', fontSize: '0.84rem' }}
+          style={{ width: '100%', maxWidth: '280px', padding: '10px 24px', fontSize: '0.86rem' }}
         >
           Log Out of Love Bug
         </button>
+
+        <button
+          type="button"
+          onClick={handleDeleteAccount}
+          disabled={deleting}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#B91C1C',
+            fontSize: '0.78rem',
+            fontWeight: 700,
+            cursor: 'pointer',
+            padding: '6px 12px',
+            textDecoration: 'underline',
+            marginTop: '8px',
+          }}
+        >
+          {deleting ? 'Deleting Account...' : '🗑️ Delete My Account Permanently'}
+        </button>
+
+        {/* Private Owner Access Link */}
+        <div style={{ marginTop: '16px', opacity: 0.5 }}>
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playPop();
+              navigate('/admin');
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '0.72rem',
+              color: 'var(--color-warm-brown-light)',
+              cursor: 'pointer',
+            }}
+          >
+            🔒 Owner Space
+          </button>
+        </div>
       </div>
     </div>
   );

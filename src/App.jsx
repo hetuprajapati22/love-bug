@@ -9,7 +9,11 @@ import Lobby from './pages/Lobby';
 import GameScreen from './pages/GameScreen';
 import Results from './pages/Results';
 import Settings from './pages/Settings';
-import AdminDashboard from './pages/AdminDashboard';
+import CoupleDashboard from './pages/AdminDashboard';
+import Admin from './pages/Admin';
+import LevelMap from './pages/LevelMap';
+import History from './pages/History';
+import PrivacyTerms from './pages/PrivacyTerms';
 import DashboardDemo from './pages/DashboardDemo';
 import FloatingHearts from './components/ui/FloatingHearts';
 import LoveBug from './components/mascot/LoveBug';
@@ -123,7 +127,39 @@ export default function App() {
               path="/couple-dashboard"
               element={
                 <ProtectedRoute>
-                  <AdminDashboard />
+                  <CoupleDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/level-map"
+              element={
+                <ProtectedRoute>
+                  <LevelMap />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/history"
+              element={
+                <ProtectedRoute>
+                  <History />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/privacy"
+              element={
+                <ProtectedRoute>
+                  <PrivacyTerms />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/terms"
+              element={
+                <ProtectedRoute>
+                  <PrivacyTerms />
                 </ProtectedRoute>
               }
             />
@@ -131,7 +167,7 @@ export default function App() {
               path="/admin"
               element={
                 <ProtectedRoute>
-                  <AdminDashboard />
+                  <Admin />
                 </ProtectedRoute>
               }
             />

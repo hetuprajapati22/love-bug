@@ -269,9 +269,35 @@ export default function Dashboard() {
 
       {/* 3 Games Section */}
       <div style={{ marginBottom: '16px' }}>
-        <h3 style={{ fontSize: '1.15rem', marginBottom: '12px', paddingLeft: '4px' }}>
-          Our Games 🎮
-        </h3>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px', paddingLeft: '4px' }}>
+          <h3 style={{ fontSize: '1.15rem', margin: 0 }}>
+            Our Games 🎮
+          </h3>
+          <div style={{ display: 'flex', gap: '6px' }}>
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playPop();
+                navigate('/level-map');
+              }}
+              className="badge-chip lavender interactive-card"
+              style={{ fontSize: '0.74rem', cursor: 'pointer', padding: '4px 10px' }}
+            >
+              🗺️ Map
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                soundEffects.playPop();
+                navigate('/history');
+              }}
+              className="badge-chip pink interactive-card"
+              style={{ fontSize: '0.74rem', cursor: 'pointer', padding: '4px 10px' }}
+            >
+              📜 History
+            </button>
+          </div>
+        </div>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {games.map((game) => (
