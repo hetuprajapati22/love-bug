@@ -327,6 +327,38 @@ export default function Settings() {
         )}
       </div>
 
+      {/* About Love Bug & Creator (Above Couple Dashboard) */}
+      <div
+        className="glass-card interactive-card"
+        onClick={() => {
+          soundEffects.playPop();
+          navigate('/about');
+        }}
+        style={{
+          marginBottom: '14px',
+          padding: '16px 20px',
+          background: 'linear-gradient(135deg, rgba(248, 201, 216, 0.65) 0%, rgba(255, 245, 229, 0.75) 100%)',
+          border: '1.5px solid var(--color-muted-rose)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '1.6rem' }}>🌸</span>
+          <div>
+            <div style={{ fontSize: '0.95rem', fontWeight: 800, color: 'var(--color-warm-brown)' }}>
+              About Love Bug & Creator
+            </div>
+            <div style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)' }}>
+              Discover the story & meet Hetu Prajapati
+            </div>
+          </div>
+        </div>
+        <span>➔</span>
+      </div>
+
       {/* Couple Dashboard Access Card */}
       <div
         className="glass-card interactive-card"

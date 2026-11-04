@@ -113,6 +113,38 @@ export default function CoupleDashboard() {
         </button>
       </div>
 
+      {/* About Section Card (Placed above Couple Details) */}
+      <div
+        className="glass-card interactive-card"
+        onClick={() => {
+          soundEffects.playPop();
+          navigate('/about');
+        }}
+        style={{
+          marginBottom: '14px',
+          padding: '12px 16px',
+          background: 'linear-gradient(135deg, rgba(248, 201, 216, 0.6) 0%, rgba(255, 245, 229, 0.7) 100%)',
+          border: '1.5px solid var(--color-muted-rose)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          cursor: 'pointer',
+        }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <span style={{ fontSize: '1.4rem' }}>🌸</span>
+          <div>
+            <div style={{ fontSize: '0.88rem', fontWeight: 800, color: 'var(--color-warm-brown)' }}>
+              About Love Bug & Creator
+            </div>
+            <div style={{ fontSize: '0.72rem', color: 'var(--color-warm-brown-light)' }}>
+              Read the story behind the game & meet Hetu Prajapati
+            </div>
+          </div>
+        </div>
+        <span style={{ fontSize: '0.88rem' }}>➔</span>
+      </div>
+
       {/* Hero Couple Presentation Card */}
       <div className="glass-card" style={{ marginBottom: '16px', textAlign: 'center' }}>
         <div className="animate-mascot-bob" style={{ marginBottom: '10px' }}>
