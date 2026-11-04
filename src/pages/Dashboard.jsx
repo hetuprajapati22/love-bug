@@ -11,7 +11,7 @@ import { soundEffects } from '../utils/soundEffects';
  * Real live dashboard connected to Supabase auth, couple pairing, and game launcher.
  */
 export default function Dashboard() {
-  const { profile, couple, isCoupled, signOut, refreshUserData } = useAuth();
+  const { user, profile, couple, isCoupled, signOut, refreshUserData } = useAuth();
   const navigate = useNavigate();
 
   const [mascotMood, setMascotMood] = useState('happy');
@@ -169,6 +169,30 @@ export default function Dashboard() {
             }}
           >
             ⚙️
+          </button>
+
+          {/* Owner Admin Panel Button */}
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playPop();
+              navigate('/admin');
+            }}
+            title="Open Owner Admin Panel"
+            style={{
+              background: 'rgba(220, 212, 247, 0.45)',
+              border: '1.5px solid var(--color-glass-border)',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.92rem',
+            }}
+          >
+            🛡️
           </button>
 
           {isCoupled ? (
@@ -421,6 +445,27 @@ export default function Dashboard() {
         >
           Log Out
         </button>
+
+        {/* Discreet Owner Admin Panel Link */}
+        <div style={{ textAlign: 'center', marginTop: '12px', opacity: 0.65 }}>
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playPop();
+              navigate('/admin');
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '0.74rem',
+              color: 'var(--color-warm-brown)',
+              cursor: 'pointer',
+              fontWeight: 700,
+            }}
+          >
+            🛡️ Owner Admin Panel
+          </button>
+        </div>
       </div>
 
       {/* Couple Milestones & Achievements Modal */}
