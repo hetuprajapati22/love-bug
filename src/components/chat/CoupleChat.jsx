@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import LoveBug from '../mascot/LoveBug';
 import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabaseClient';
@@ -177,6 +178,14 @@ export default function CoupleChat() {
     '☕ Chai date together?',
     '🥰 You are so cute',
   ];
+
+  const location = useLocation();
+
+  // Only show chat AFTER partner is connected (isCoupled) and hide on pairing/setup screens
+  const hiddenPaths = ['/login', '/setup', '/couple'];
+  if (!isCoupled || !user || hiddenPaths.includes(location.pathname)) {
+    return null;
+  }
 
   return (
     <>
