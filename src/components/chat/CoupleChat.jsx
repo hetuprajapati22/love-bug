@@ -85,10 +85,11 @@ export default function CoupleChat() {
   const [inputText, setInputText] = useState('');
   const [isAiTyping, setIsAiTyping] = useState(false);
   const messagesEndRef = useRef(null);
+  const inputRef = useRef(null);
 
   const channelRef = useRef(null);
 
-  // Real-time Supabase Broadcast channel for Instant Partner Chat
+  // Real-time Supabase Broadcast channel for Instant Partner Chat & Read Receipts
   useEffect(() => {
     if (!coupleId || !supabase) return;
 
@@ -110,10 +111,58 @@ export default function CoupleChat() {
         if (!isOpen) {
           setUnreadCount((c) => c + 1);
         }
+
+        // Acknowledge delivery
+        try {
+          channel.send({
+            type: 'broadcast',
+            event: 'message_delivered',
+            payload: { messageId: incoming.id },
+          });
+          // If chat window is already open, acknowledge read immediately
+          if (isOpen) {
+            channel.send({
+              type: 'broadcast',
+              event: 'messages_read',
+              payload: { messageId: incoming.id },
+            });
+          }
+        } catch (_) {}
+      })
+      .on('broadcast', { event: 'message_delivered' }, ({ payload }) => {
+        // Mark message as delivered (double check ✓✓)
+        setPartnerMessages((prev) =>
+          prev.map((m) =>
+            m.id === payload.messageId || String(m.id) === String(payload.messageId)
+              ? { ...m, delivered: true }
+              : m
+          )
+        );
+      })
+      .on('broadcast', { event: 'messages_read' }, ({ payload }) => {
+        // Mark messages as read by sweetheart (pink double check ✓✓)
+        setPartnerMessages((prev) =>
+          prev.map((m) => {
+            if (m.senderId === user?.id) {
+              if (!payload.messageId || String(m.id) <= String(payload.messageId)) {
+                return { ...m, delivered: true, read: true };
+              }
+            }
+            return m;
+          })
+        );
       })
       .subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           channelRef.current = channel;
+          // When connected, if chat is open, broadcast that messages are read
+          if (isOpen && activeTab === 'partner') {
+            channel.send({
+              type: 'broadcast',
+              event: 'messages_read',
+              payload: { messageId: Date.now() },
+            }).catch(() => {});
+          }
         }
       });
 
@@ -121,7 +170,20 @@ export default function CoupleChat() {
       supabase.removeChannel(channel);
       channelRef.current = null;
     };
-  }, [coupleId, isOpen]);
+  }, [coupleId, isOpen, activeTab, user?.id]);
+
+  // When opening the chat modal or switching to partner tab, mark partner's messages as read
+  useEffect(() => {
+    if (isOpen && activeTab === 'partner' && channelRef.current) {
+      try {
+        channelRef.current.send({
+          type: 'broadcast',
+          event: 'messages_read',
+          payload: { messageId: Date.now() },
+        });
+      } catch (_) {}
+    }
+  }, [isOpen, activeTab]);
 
   // Auto-scroll
   useEffect(() => {
@@ -145,10 +207,17 @@ export default function CoupleChat() {
       text,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       createdAt: now,
+      delivered: false,
+      read: false,
     };
 
     setPartnerMessages((prev) => [...prev, newMsg]);
     setInputText('');
+
+    // Keep mobile keyboard open
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
 
     // Broadcast live to partner device
     try {
@@ -186,6 +255,11 @@ export default function CoupleChat() {
     setAiMessages((prev) => [...prev, userMsg]);
     setInputText('');
     setIsAiTyping(true);
+
+    // Keep mobile keyboard open
+    requestAnimationFrame(() => {
+      inputRef.current?.focus();
+    });
 
     setTimeout(() => {
       const q = text.toLowerCase();
@@ -469,7 +543,23 @@ export default function CoupleChat() {
                         }}
                       >
                         <strong>{isMe ? 'You' : partnerPetName}</strong>
-                        <span>{m.timestamp}</span>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '3px' }}>
+                          {m.timestamp}
+                          {isMe && (
+                            <span
+                              style={{
+                                fontSize: '0.78rem',
+                                fontWeight: 900,
+                                color: m.read ? '#C26383' : m.delivered ? 'rgba(74, 47, 42, 0.7)' : 'rgba(74, 47, 42, 0.4)',
+                                marginLeft: '2px',
+                                letterSpacing: '-1.5px',
+                              }}
+                              title={m.read ? 'Seen by partner' : m.delivered ? 'Delivered' : 'Sent'}
+                            >
+                              {m.read ? '✓✓' : m.delivered ? '✓✓' : '✓'}
+                            </span>
+                          )}
+                        </span>
                       </div>
                       <div>{m.text}</div>
                     </div>
@@ -523,6 +613,10 @@ export default function CoupleChat() {
             onSubmit={(e) => {
               e.preventDefault();
               handleSend();
+              // Prevent virtual keyboard from closing on mobile
+              requestAnimationFrame(() => {
+                inputRef.current?.focus();
+              });
             }}
             style={{
               padding: '8px 12px 10px',
@@ -549,6 +643,16 @@ export default function CoupleChat() {
                 type="submit"
                 disabled={!inputText.trim()}
                 title="Send Message"
+                onMouseDown={(e) => {
+                  // Prevent button tap from blurring input & dismissing mobile keyboard
+                  e.preventDefault();
+                }}
+                onTouchEnd={() => {
+                  // Keep keyboard open after touch tap
+                  requestAnimationFrame(() => {
+                    inputRef.current?.focus();
+                  });
+                }}
                 style={{
                   background: inputText.trim()
                     ? 'linear-gradient(135deg, #E68FA9 0%, #D985A3 100%)'
@@ -575,6 +679,7 @@ export default function CoupleChat() {
             {/* Message Input Line */}
             <div style={{ width: '100%' }}>
               <input
+                ref={inputRef}
                 type="text"
                 value={inputText}
                 onChange={(e) => setInputText(e.target.value)}
