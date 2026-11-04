@@ -422,8 +422,26 @@ export default function Dashboard() {
           Log Out
         </button>
 
-        {/* Discreet Owner Admin Panel Link */}
-        <div style={{ textAlign: 'center', marginTop: '12px', opacity: 0.65 }}>
+        {/* Footer Links: About & Owner Admin */}
+        <div style={{ display: 'flex', justifyContent: 'center', gap: '16px', marginTop: '14px', opacity: 0.7 }}>
+          <button
+            type="button"
+            onClick={() => {
+              soundEffects.playPop();
+              navigate('/about');
+            }}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '0.74rem',
+              color: 'var(--color-warm-brown)',
+              cursor: 'pointer',
+              fontWeight: 700,
+            }}
+          >
+            🌸 About Love Bug
+          </button>
+
           <button
             type="button"
             onClick={() => {
@@ -439,7 +457,7 @@ export default function Dashboard() {
               fontWeight: 700,
             }}
           >
-            🛡️ Owner Admin Panel
+            🛡️ Owner Admin
           </button>
         </div>
       </div>

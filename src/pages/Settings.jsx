@@ -359,8 +359,8 @@ export default function Settings() {
         <span>➔</span>
       </div>
 
-      {/* History & Legal Navigation Links */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', marginBottom: '20px' }}>
+      {/* History, Legal & About Navigation Links */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '8px', marginBottom: '20px' }}>
         <button
           type="button"
           onClick={() => {
@@ -368,11 +368,11 @@ export default function Settings() {
             navigate('/history');
           }}
           className="glass-card interactive-card"
-          style={{ padding: '14px 10px', textAlign: 'center', cursor: 'pointer' }}
+          style={{ padding: '12px 6px', textAlign: 'center', cursor: 'pointer' }}
         >
-          <div style={{ fontSize: '1.4rem', marginBottom: '2px' }}>📜</div>
-          <div style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--color-warm-brown)' }}>
-            Game History
+          <div style={{ fontSize: '1.3rem', marginBottom: '2px' }}>📜</div>
+          <div style={{ fontSize: '0.76rem', fontWeight: 800, color: 'var(--color-warm-brown)' }}>
+            History
           </div>
         </button>
 
@@ -383,11 +383,26 @@ export default function Settings() {
             navigate('/privacy');
           }}
           className="glass-card interactive-card"
-          style={{ padding: '14px 10px', textAlign: 'center', cursor: 'pointer' }}
+          style={{ padding: '12px 6px', textAlign: 'center', cursor: 'pointer' }}
         >
-          <div style={{ fontSize: '1.4rem', marginBottom: '2px' }}>⚖️</div>
-          <div style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--color-warm-brown)' }}>
-            Privacy & Terms
+          <div style={{ fontSize: '1.3rem', marginBottom: '2px' }}>⚖️</div>
+          <div style={{ fontSize: '0.76rem', fontWeight: 800, color: 'var(--color-warm-brown)' }}>
+            Privacy
+          </div>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => {
+            soundEffects.playPop();
+            navigate('/about');
+          }}
+          className="glass-card interactive-card"
+          style={{ padding: '12px 6px', textAlign: 'center', cursor: 'pointer' }}
+        >
+          <div style={{ fontSize: '1.3rem', marginBottom: '2px' }}>🌸</div>
+          <div style={{ fontSize: '0.76rem', fontWeight: 800, color: 'var(--color-warm-brown)' }}>
+            About
           </div>
         </button>
       </div>

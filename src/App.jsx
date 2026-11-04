@@ -14,6 +14,7 @@ import Admin from './pages/Admin';
 import LevelMap from './pages/LevelMap';
 import History from './pages/History';
 import PrivacyTerms from './pages/PrivacyTerms';
+import About from './pages/About';
 import DashboardDemo from './pages/DashboardDemo';
 import FloatingHearts from './components/ui/FloatingHearts';
 import LoveBug from './components/mascot/LoveBug';
@@ -160,6 +161,14 @@ export default function App() {
               element={
                 <ProtectedRoute>
                   <PrivacyTerms />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/about"
+              element={
+                <ProtectedRoute>
+                  <About />
                 </ProtectedRoute>
               }
             />
