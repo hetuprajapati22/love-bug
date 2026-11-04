@@ -2,6 +2,8 @@
 
 A cute, aesthetic, real-time web game designed exclusively for couples to connect, laugh, and fall deeper in love through three intimate games, instant live chat, and personalized love letters.
 
+🌐 **Live Website:** [https://love-bug-couple.netlify.app](https://love-bug-couple.netlify.app)
+
 ---
 
 ## ✨ Key Features
