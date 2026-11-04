@@ -78,25 +78,46 @@ export const sessionService = {
    */
   async submitAnswer(sessionId, levelNumber, answer) {
     if (!supabase) throw new Error('Supabase client not initialized');
+
+    // Fetch latest session to ensure we are submitting for the authoritative level
+    const sess = await this.getSession(sessionId);
+    const targetLevel = sess?.current_level || levelNumber;
+
     const { data, error } = await supabase.rpc('submit_level_answer', {
       p_session_id: sessionId,
-      p_level_number: levelNumber,
+      p_level_number: targetLevel,
       p_answer: answer,
     });
     if (error) throw error;
-    return data;
+    return { ...data, current_level: targetLevel };
   },
 
   /**
    * Advance question index after both answers are submitted
+   * Gracefully handles race conditions if partner already advanced
    */
   async advanceLevel(sessionId) {
     if (!supabase) throw new Error('Supabase client not initialized');
-    const { data, error } = await supabase.rpc('advance_session_level', {
-      p_session_id: sessionId,
-    });
-    if (error) throw error;
-    return data;
+    try {
+      const { data, error } = await supabase.rpc('advance_session_level', {
+        p_session_id: sessionId,
+      });
+      if (error) throw error;
+      return data;
+    } catch (err) {
+      // If error occurred (e.g. partner already advanced level in DB),
+      // fetch latest session and return its actual level
+      const sess = await this.getSession(sessionId);
+      if (sess) {
+        return {
+          current_level: sess.current_level,
+          current_stage: sess.current_stage,
+          status: sess.status,
+          already_advanced: true,
+        };
+      }
+      throw err;
+    }
   },
 
   /**

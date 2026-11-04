@@ -168,16 +168,16 @@ export default function GameScreen() {
         // Partner locked their answer, recheck state
         loadSessionState();
       })
-      .on('broadcast', { event: 'level_advanced' }, async (payload) => {
+      .on('broadcast', { event: 'level_advanced' }, (payload) => {
         // Partner pressed "Next Question", advance both immediately!
         soundEffects.playPop();
+        const nextLevel = payload.newLevel;
         setSelectedOption(null);
         setLockedAnswer(null);
         setRevealed(false);
         setRevealData(null);
         setTodPhase('pick');
-        setSession((prev) => (prev ? { ...prev, current_level: payload.newLevel } : prev));
-        await loadSessionState();
+        setSession((prev) => (prev ? { ...prev, current_level: nextLevel } : { current_level: nextLevel }));
       })
       .on('broadcast', { event: 'game_completed' }, () => {
         soundEffects.playCelebrate();
@@ -240,48 +240,58 @@ export default function GameScreen() {
     };
   }, [sessionId, loadSessionState, gameKey, navigate]);
 
-  // ── Heartbeat Polling Fallback (Guarantees zero stuck partners even on laggy 4G) ──
+  // ── Continuous Heartbeat Polling (Runs active sync so neither partner can ever get stuck) ──
   useEffect(() => {
-    if (!sessionId || revealed) return;
+    if (!sessionId) return;
 
     const poll = setInterval(async () => {
       try {
-        // Check if both answers have arrived in DB
-        const answers = await sessionService.getLevelAnswers(sessionId, currentLevel);
-        if (answers.length >= 2) {
-          const p1Ans = answers.find((a) => a.user_id === session?.partner_1_id);
-          const p2Ans = answers.find((a) => a.user_id === session?.partner_2_id);
-          setRevealData({ partner_1_answer: p1Ans?.answer, partner_2_answer: p2Ans?.answer });
-          setRevealed(true);
-          if (p1Ans?.answer?.choice === p2Ans?.answer?.choice) {
-            soundEffects.playMatch();
-          } else {
-            soundEffects.playPop();
-          }
-          return;
-        }
+        const activeLevel = session?.current_level || currentLevel;
 
-        // Check if partner already advanced level in DB
+        // 1. Check if DB session level has moved ahead of our screen
         const sess = await sessionService.getSession(sessionId);
         if (sess) {
-          if (sess.current_level > currentLevel) {
-            setSession(sess);
+          if (sess.current_level > activeLevel) {
+            // Partner advanced to next question! Synchronize this screen immediately!
+            soundEffects.playPop();
             setSelectedOption(null);
             setLockedAnswer(null);
             setRevealed(false);
             setRevealData(null);
             setTodPhase('pick');
+            setSession(sess);
+            return;
           } else if (sess.status === 'completed') {
+            soundEffects.playCelebrate();
             navigate(`/results?session=${sessionId}&game=${gameKey}`);
+            return;
+          }
+        }
+
+        // 2. If waiting for reveal, check if both answers have arrived in DB
+        if (!revealed) {
+          const answers = await sessionService.getLevelAnswers(sessionId, activeLevel);
+          if (answers.length >= 2) {
+            const p1Id = sess?.partner_1_id || session?.partner_1_id;
+            const p2Id = sess?.partner_2_id || session?.partner_2_id;
+            const p1Ans = answers.find((a) => a.user_id === p1Id);
+            const p2Ans = answers.find((a) => a.user_id === p2Id);
+            setRevealData({ partner_1_answer: p1Ans?.answer, partner_2_answer: p2Ans?.answer });
+            setRevealed(true);
+            if (p1Ans?.answer?.choice === p2Ans?.answer?.choice) {
+              soundEffects.playMatch();
+            } else {
+              soundEffects.playPop();
+            }
           }
         }
       } catch (err) {
-        // Background polling fallback, ignore minor connection ripples
+        // Silent polling fallback
       }
     }, 1500);
 
     return () => clearInterval(poll);
-  }, [sessionId, currentLevel, revealed, session?.partner_1_id, session?.partner_2_id, gameKey, navigate]);
+  }, [sessionId, currentLevel, revealed, session?.current_level, session?.partner_1_id, session?.partner_2_id, gameKey, navigate]);
 
   // ── Helper to broadcast sync events safely ───────────────────────────────────
   const broadcastSync = (event, payload = {}) => {
@@ -413,19 +423,32 @@ export default function GameScreen() {
         navigate(`/results?session=${sessionId}&game=${gameKey}`);
       } else {
         soundEffects.playPop();
-        const nextLevel = (session?.current_level || currentLevel) + 1;
+        const nextLevel = res.current_level || (session?.current_level || currentLevel) + 1;
         setSelectedOption(null);
         setLockedAnswer(null);
         setRevealed(false);
         setRevealData(null);
         setTodPhase('pick');
-        setSession((prev) => (prev ? { ...prev, current_level: nextLevel } : prev));
+        setSession((prev) => (prev ? { ...prev, current_level: nextLevel } : { current_level: nextLevel }));
 
         // Instant broadcast advance to partner device
         broadcastSync('level_advanced', { newLevel: nextLevel });
       }
     } catch (err) {
       console.error(err);
+      try {
+        const sess = await sessionService.getSession(sessionId);
+        if (sess && sess.current_level > currentLevel) {
+          soundEffects.playPop();
+          setSelectedOption(null);
+          setLockedAnswer(null);
+          setRevealed(false);
+          setRevealData(null);
+          setTodPhase('pick');
+          setSession(sess);
+          return;
+        }
+      } catch (_) {}
       setErrorMsg(err.message || 'Could not advance to next question.');
     } finally {
       setAdvancing(false);
@@ -458,9 +481,10 @@ export default function GameScreen() {
     const todMatch = gameKey === 'truth_or_dare' && p1Ans?.choice === p2Ans?.choice;
     const showMatch = gameKey === 'truth_or_dare' ? todMatch : isMatch;
 
-    // Labels for who is who
-    const myLabel = session?.is_partner_1 ? myPetName : partnerPetName;
-    const partnerLabel = session?.is_partner_1 ? partnerPetName : myPetName;
+    // Correctly determine who is Partner 1 based on partner_1_id
+    const isP1 = session?.partner_1_id ? session.partner_1_id === user?.id : Boolean(session?.is_partner_1);
+    const myLabel = isP1 ? myPetName : partnerPetName;
+    const partnerLabel = isP1 ? partnerPetName : myPetName;
 
     return (
       <div className="animate-fade-in" style={{ textAlign: 'center', position: 'relative' }}>
@@ -503,7 +527,7 @@ export default function GameScreen() {
             }}
           >
             <div style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)', fontWeight: 700, marginBottom: '4px' }}>
-              {session?.is_partner_1 ? myLabel : partnerLabel}
+              {isP1 ? myLabel : partnerLabel}
             </div>
             {gameKey === 'truth_or_dare' && (
               <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--color-deep-rose)', marginBottom: '4px' }}>
@@ -525,7 +549,7 @@ export default function GameScreen() {
             }}
           >
             <div style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)', fontWeight: 700, marginBottom: '4px' }}>
-              {session?.is_partner_1 ? partnerLabel : myLabel}
+              {isP1 ? partnerLabel : myLabel}
             </div>
             {gameKey === 'truth_or_dare' && (
               <div style={{ fontSize: '0.78rem', fontWeight: 800, color: 'var(--color-deep-rose)', marginBottom: '4px' }}>
