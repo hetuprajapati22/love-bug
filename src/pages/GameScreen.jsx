@@ -116,20 +116,22 @@ export default function GameScreen() {
         setLockedAnswer(myAns.answer);
         // Restore ToD phase if already done
         if (gameKey === 'truth_or_dare') setTodPhase('doing');
+
+        // Check if both have answered via security-definer RPC (bypasses RLS)
+        const check = await sessionService.checkRevealStatus(sessionId, sess.current_level, myAns.answer);
+        if (check?.both_answered) {
+          setRevealData({ partner_1_answer: check.partner_1_answer, partner_2_answer: check.partner_2_answer });
+          setRevealed(true);
+        } else {
+          setRevealed(false);
+          setRevealData(null);
+        }
       } else {
         setLockedAnswer(null);
         setSelectedOption(null);
-        if (gameKey === 'truth_or_dare') setTodPhase('pick');
-      }
-
-      if (answers.length >= 2) {
-        const p1Ans = answers.find((a) => a.user_id === sess.partner_1_id);
-        const p2Ans = answers.find((a) => a.user_id === sess.partner_2_id);
-        setRevealData({ partner_1_answer: p1Ans?.answer, partner_2_answer: p2Ans?.answer });
-        setRevealed(true);
-      } else {
         setRevealed(false);
         setRevealData(null);
+        if (gameKey === 'truth_or_dare') setTodPhase('pick');
       }
     } catch (err) {
       console.error(err);
@@ -268,17 +270,16 @@ export default function GameScreen() {
           }
         }
 
-        // 2. If waiting for reveal, check if both answers have arrived in DB
-        if (!revealed) {
-          const answers = await sessionService.getLevelAnswers(sessionId, activeLevel);
-          if (answers.length >= 2) {
-            const p1Id = sess?.partner_1_id || session?.partner_1_id;
-            const p2Id = sess?.partner_2_id || session?.partner_2_id;
-            const p1Ans = answers.find((a) => a.user_id === p1Id);
-            const p2Ans = answers.find((a) => a.user_id === p2Id);
-            setRevealData({ partner_1_answer: p1Ans?.answer, partner_2_answer: p2Ans?.answer });
+        // 2. If locked answer is waiting for partner, verify via Security-Definer RPC (bypasses RLS limits)
+        if (lockedAnswer && !revealed) {
+          const check = await sessionService.checkRevealStatus(sessionId, activeLevel, lockedAnswer);
+          if (check?.both_answered) {
+            setRevealData({
+              partner_1_answer: check.partner_1_answer,
+              partner_2_answer: check.partner_2_answer,
+            });
             setRevealed(true);
-            if (p1Ans?.answer?.choice === p2Ans?.answer?.choice) {
+            if (check.partner_1_answer?.choice === check.partner_2_answer?.choice) {
               soundEffects.playMatch();
             } else {
               soundEffects.playPop();
@@ -291,7 +292,7 @@ export default function GameScreen() {
     }, 1500);
 
     return () => clearInterval(poll);
-  }, [sessionId, currentLevel, revealed, session?.current_level, session?.partner_1_id, session?.partner_2_id, gameKey, navigate]);
+  }, [sessionId, currentLevel, revealed, lockedAnswer, session?.current_level, gameKey, navigate]);
 
   // ── Helper to broadcast sync events safely ───────────────────────────────────
   const broadcastSync = (event, payload = {}) => {

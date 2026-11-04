@@ -93,6 +93,24 @@ export const sessionService = {
   },
 
   /**
+   * Check if both partners have answered (bypasses RLS recursion via security definer RPC)
+   */
+  async checkRevealStatus(sessionId, levelNumber, lockedAnswer) {
+    if (!supabase || !sessionId || !lockedAnswer) return null;
+    try {
+      const { data, error } = await supabase.rpc('submit_level_answer', {
+        p_session_id: sessionId,
+        p_level_number: levelNumber,
+        p_answer: lockedAnswer,
+      });
+      if (error) return null;
+      return data;
+    } catch {
+      return null;
+    }
+  },
+
+  /**
    * Advance question index after both answers are submitted
    * Gracefully handles race conditions if partner already advanced
    */

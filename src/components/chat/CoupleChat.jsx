@@ -44,7 +44,7 @@ export default function CoupleChat() {
   const myPetName = profile?.pet_name || 'You';
   const partnerPetName = couple?.partner_pet_name || 'Partner';
   // Note: get_my_couple_data returns 'couple_id'
-  const coupleId = couple?.couple_id || couple?.id || (user ? `couple_${user.id}` : null);
+  const coupleId = couple?.couple_id || couple?.id;
 
   // Partner chat messages (persisted for 24 hours across refreshes)
   const [partnerMessages, setPartnerMessages] = useState(() => {
@@ -159,10 +159,16 @@ export default function CoupleChat() {
           payload: newMsg,
         });
       } else if (supabase && coupleId) {
-        await supabase.channel(`couple_chat_${coupleId}`).send({
-          type: 'broadcast',
-          event: 'new_message',
-          payload: newMsg,
+        const tempChannel = supabase.channel(`couple_chat_${coupleId}`);
+        tempChannel.subscribe(async (status) => {
+          if (status === 'SUBSCRIBED') {
+            await tempChannel.send({
+              type: 'broadcast',
+              event: 'new_message',
+              payload: newMsg,
+            });
+            channelRef.current = tempChannel;
+          }
         });
       }
     } catch (err) {
@@ -512,56 +518,84 @@ export default function CoupleChat() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input Box */}
+          {/* Input Box: Send icon located just above the message input line */}
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSend();
             }}
             style={{
-              padding: '10px 12px',
+              padding: '8px 12px 10px',
               borderTop: '1px solid rgba(74, 47, 42, 0.1)',
               background: '#fff',
               display: 'flex',
-              gap: '8px',
+              flexDirection: 'column',
+              gap: '6px',
             }}
           >
-            <input
-              type="text"
-              value={inputText}
-              onChange={(e) => setInputText(e.target.value)}
-              placeholder={
-                activeTab === 'partner'
-                  ? `Message ${partnerPetName}...`
-                  : 'Ask Love Bug anything...'
-              }
+            {/* Action Bar: Send icon right above the message typing line */}
+            <div
               style={{
-                flex: 1,
-                padding: '8px 14px',
-                borderRadius: 'var(--radius-pill)',
-                border: '1.5px solid var(--color-glass-border)',
-                outline: 'none',
-                fontSize: '0.85rem',
-                color: 'var(--color-warm-brown)',
-              }}
-            />
-            <button
-              type="submit"
-              disabled={!inputText.trim()}
-              style={{
-                background: 'linear-gradient(135deg, #F8C9D8, #D985A3)',
-                border: 'none',
-                borderRadius: 'var(--radius-pill)',
-                padding: '0 16px',
-                cursor: inputText.trim() ? 'pointer' : 'default',
-                fontWeight: 800,
-                fontSize: '0.85rem',
-                color: '#4A2F2A',
-                opacity: inputText.trim() ? 1 : 0.5,
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '0 4px',
               }}
             >
-              Send 💌
-            </button>
+              <span style={{ fontSize: '0.74rem', color: 'var(--color-warm-brown-light)', fontWeight: 600 }}>
+                {activeTab === 'partner' ? `To: ${partnerPetName} 💬` : 'Love Bug AI 🐛'}
+              </span>
+              <button
+                type="submit"
+                disabled={!inputText.trim()}
+                title="Send Message"
+                style={{
+                  background: inputText.trim()
+                    ? 'linear-gradient(135deg, #E68FA9 0%, #D985A3 100%)'
+                    : 'rgba(217, 133, 163, 0.25)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-pill)',
+                  padding: '4px 14px',
+                  cursor: inputText.trim() ? 'pointer' : 'default',
+                  fontWeight: 800,
+                  fontSize: '0.8rem',
+                  color: inputText.trim() ? '#FFFFFF' : 'var(--color-warm-brown-light)',
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  boxShadow: inputText.trim() ? '0 2px 8px rgba(217, 133, 163, 0.35)' : 'none',
+                  transition: 'all 0.2s ease',
+                }}
+              >
+                <span>Send</span>
+                <span style={{ fontSize: '0.9rem' }}>💌 ➤</span>
+              </button>
+            </div>
+
+            {/* Message Input Line */}
+            <div style={{ width: '100%' }}>
+              <input
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                placeholder={
+                  activeTab === 'partner'
+                    ? `Message ${partnerPetName}...`
+                    : 'Ask Love Bug anything...'
+                }
+                style={{
+                  width: '100%',
+                  padding: '9px 14px',
+                  borderRadius: 'var(--radius-pill)',
+                  border: '1.5px solid var(--color-glass-border)',
+                  outline: 'none',
+                  fontSize: '0.88rem',
+                  color: 'var(--color-warm-brown)',
+                  background: 'rgba(255, 245, 229, 0.4)',
+                  boxSizing: 'border-box',
+                }}
+              />
+            </div>
           </form>
         </div>
       )}
