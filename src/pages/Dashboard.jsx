@@ -171,30 +171,6 @@ export default function Dashboard() {
             ⚙️
           </button>
 
-          {/* Owner Admin Panel Button */}
-          <button
-            type="button"
-            onClick={() => {
-              soundEffects.playPop();
-              navigate('/admin');
-            }}
-            title="Open Owner Admin Panel"
-            style={{
-              background: 'rgba(220, 212, 247, 0.45)',
-              border: '1.5px solid var(--color-glass-border)',
-              borderRadius: '50%',
-              width: '32px',
-              height: '32px',
-              cursor: 'pointer',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '0.92rem',
-            }}
-          >
-            🛡️
-          </button>
-
           {isCoupled ? (
             <div
               className="badge-chip pink interactive-card"
