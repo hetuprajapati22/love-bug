@@ -97,6 +97,32 @@ export default function GameScreen() {
 
   // ── Broadcast Channel Reference ────────────────────────────────────────────
   const syncChannelRef = useRef(null);
+  // Guard refs to prevent background polls/broadcasts from wiping state
+  const submittingRef = useRef(false);
+  const currentLevelRef = useRef(currentLevel);
+  const lockedAnswerRef = useRef(lockedAnswer);
+  const revealedRef = useRef(revealed);
+
+  useEffect(() => { currentLevelRef.current = currentLevel; }, [currentLevel]);
+  useEffect(() => { lockedAnswerRef.current = lockedAnswer; }, [lockedAnswer]);
+  useEffect(() => { revealedRef.current = revealed; }, [revealed]);
+
+  // ── Clean reset ONLY when moving to a brand new question level ──────────────
+  const resetForNewLevel = useCallback((newLevel, newSession = null) => {
+    currentLevelRef.current = newLevel;
+    lockedAnswerRef.current = null;
+    revealedRef.current = false;
+    setSelectedOption(null);
+    setLockedAnswer(null);
+    setRevealed(false);
+    setRevealData(null);
+    setTodPhase('pick');
+    if (newSession) {
+      setSession(newSession);
+    } else {
+      setSession((prev) => (prev ? { ...prev, current_level: newLevel } : { current_level: newLevel }));
+    }
+  }, []);
 
   // ── Load session + existing answer ──────────────────────────────────────────
   const loadSessionState = useCallback(async () => {
@@ -104,44 +130,47 @@ export default function GameScreen() {
       navigate('/');
       return;
     }
+
     try {
       const sess = await sessionService.getSession(sessionId);
       if (!sess) { navigate('/'); return; }
       setSession(sess);
+
+      // If DB level moved ahead of screen, advance cleanly
+      if (sess.current_level > currentLevelRef.current) {
+        resetForNewLevel(sess.current_level, sess);
+        return;
+      }
 
       const answers = await sessionService.getLevelAnswers(sessionId, sess.current_level);
       const myAns = answers.find((a) => a.user_id === user?.id);
 
       if (myAns) {
         setLockedAnswer(myAns.answer);
-        // Restore ToD phase if already done
+        lockedAnswerRef.current = myAns.answer;
         if (gameKey === 'truth_or_dare') setTodPhase('doing');
-
-        // Check if both have answered (read-only, no UPSERT)
-        const check = await sessionService.checkRevealStatus(sessionId, sess.current_level);
-        if (check?.both_answered && check.answers) {
-          const myReveal = check.answers.find((a) => a.user_id === user?.id);
-          const partnerReveal = check.answers.find((a) => a.user_id !== user?.id);
-          setRevealData({ my_answer: myReveal?.answer, partner_answer: partnerReveal?.answer });
-          setRevealed(true);
-        } else {
-          setRevealed(false);
-          setRevealData(null);
-        }
-      } else {
-        setLockedAnswer(null);
-        setSelectedOption(null);
-        setRevealed(false);
-        setRevealData(null);
-        if (gameKey === 'truth_or_dare') setTodPhase('pick');
       }
+
+      // Check if both have answered (read-only, no UPSERT)
+      const check = await sessionService.checkRevealStatus(sessionId, sess.current_level);
+      if (check?.both_answered && check.answers) {
+        const myReveal = check.answers.find((a) => a.user_id === user?.id)?.answer || lockedAnswerRef.current;
+        const partnerReveal = check.answers.find((a) => a.user_id !== user?.id)?.answer;
+        if (myReveal && partnerReveal) {
+          setRevealData({ my_answer: myReveal, partner_answer: partnerReveal });
+          setRevealed(true);
+          revealedRef.current = true;
+        }
+      }
+      // Note: We deliberately DO NOT wipe lockedAnswer or selectedOption here.
+      // A background sync must NEVER discard the user's active choice or locked answer!
     } catch (err) {
       console.error(err);
       setErrorMsg(err.message || 'Error loading game session.');
     } finally {
       setLoading(false);
     }
-  }, [sessionId, user?.id, gameKey, navigate]);
+  }, [sessionId, user?.id, gameKey, navigate, resetForNewLevel]);
 
   useEffect(() => { loadSessionState(); }, [loadSessionState]);
 
@@ -156,34 +185,36 @@ export default function GameScreen() {
 
     syncChannel
       .on('broadcast', { event: 'reveal_answers' }, ({ payload }) => {
-        // Partner answered second, revealing both simultaneously!
-        // payload contains: my_user_id, my_answer, partner_answer (from sender's perspective)
-        // For the RECEIVER, sender's "my" is our "partner" and vice versa
+        // Partner answered, revealing both simultaneously!
+        const myChoice = lockedAnswerRef.current || payload.receiver_choice || payload.partner_answer;
+        const partnerChoice = payload.sender_choice || payload.my_answer;
+
         setRevealData({
-          my_answer: payload.partner_answer,      // sender's partner = us
-          partner_answer: payload.my_answer,       // sender's my = our partner
+          my_answer: myChoice,
+          partner_answer: partnerChoice,
         });
         setRevealed(true);
-        if (payload.my_answer?.choice === payload.partner_answer?.choice) {
+        revealedRef.current = true;
+
+        if (myChoice?.choice === partnerChoice?.choice) {
           soundEffects.playMatch();
         } else {
           soundEffects.playPop();
         }
       })
       .on('broadcast', { event: 'answer_locked' }, () => {
-        // Partner locked their answer, recheck state
-        loadSessionState();
+        // Partner locked their answer — recheck if both are now ready
+        if (!submittingRef.current) {
+          loadSessionState();
+        }
       })
       .on('broadcast', { event: 'level_advanced' }, ({ payload }) => {
         // Partner pressed "Next Question", advance both immediately!
-        soundEffects.playPop();
-        const nextLevel = payload.newLevel;
-        setSelectedOption(null);
-        setLockedAnswer(null);
-        setRevealed(false);
-        setRevealData(null);
-        setTodPhase('pick');
-        setSession((prev) => (prev ? { ...prev, current_level: nextLevel } : { current_level: nextLevel }));
+        const nextLevel = payload?.newLevel;
+        if (nextLevel && nextLevel > currentLevelRef.current) {
+          soundEffects.playPop();
+          resetForNewLevel(nextLevel);
+        }
       })
       .on('broadcast', { event: 'game_completed' }, () => {
         soundEffects.playCelebrate();
@@ -207,7 +238,9 @@ export default function GameScreen() {
           filter: `session_id=eq.${sessionId}`,
         },
         async () => {
-          await loadSessionState();
+          if (!submittingRef.current) {
+            await loadSessionState();
+          }
         }
       )
       .subscribe();
@@ -224,15 +257,10 @@ export default function GameScreen() {
         },
         (payload) => {
           const updated = payload.new;
-          setSession(updated);
           if (updated.status === 'completed') {
             navigate(`/results?session=${sessionId}&game=${gameKey}`);
-          } else {
-            setSelectedOption(null);
-            setLockedAnswer(null);
-            setRevealed(false);
-            setRevealData(null);
-            setTodPhase('pick');
+          } else if (updated.current_level > currentLevelRef.current) {
+            resetForNewLevel(updated.current_level, updated);
           }
         }
       )
@@ -244,7 +272,7 @@ export default function GameScreen() {
       supabase.removeChannel(sessionChannel);
       syncChannelRef.current = null;
     };
-  }, [sessionId, loadSessionState, gameKey, navigate]);
+  }, [sessionId, loadSessionState, gameKey, navigate, resetForNewLevel]);
 
   // ── Continuous Heartbeat Polling (Runs active sync so neither partner can ever get stuck) ──
   useEffect(() => {
@@ -252,20 +280,14 @@ export default function GameScreen() {
 
     const poll = setInterval(async () => {
       try {
-        const activeLevel = session?.current_level || currentLevel;
+        const activeLevel = currentLevelRef.current;
 
         // 1. Check if DB session level has moved ahead of our screen
         const sess = await sessionService.getSession(sessionId);
         if (sess) {
           if (sess.current_level > activeLevel) {
-            // Partner advanced to next question! Synchronize this screen immediately!
             soundEffects.playPop();
-            setSelectedOption(null);
-            setLockedAnswer(null);
-            setRevealed(false);
-            setRevealData(null);
-            setTodPhase('pick');
-            setSession(sess);
+            resetForNewLevel(sess.current_level, sess);
             return;
           } else if (sess.status === 'completed') {
             soundEffects.playCelebrate();
@@ -275,30 +297,33 @@ export default function GameScreen() {
         }
 
         // 2. If locked answer is waiting for partner, verify via read-only check
-        if (lockedAnswer && !revealed) {
+        if (lockedAnswerRef.current && !revealedRef.current) {
           const check = await sessionService.checkRevealStatus(sessionId, activeLevel);
           if (check?.both_answered && check.answers) {
-            const myReveal = check.answers.find((a) => a.user_id === user?.id);
-            const partnerReveal = check.answers.find((a) => a.user_id !== user?.id);
-            setRevealData({
-              my_answer: myReveal?.answer,
-              partner_answer: partnerReveal?.answer,
-            });
-            setRevealed(true);
-            if (myReveal?.answer?.choice === partnerReveal?.answer?.choice) {
-              soundEffects.playMatch();
-            } else {
-              soundEffects.playPop();
+            const myReveal = check.answers.find((a) => a.user_id === user?.id)?.answer || lockedAnswerRef.current;
+            const partnerReveal = check.answers.find((a) => a.user_id !== user?.id)?.answer;
+            if (myReveal && partnerReveal) {
+              setRevealData({
+                my_answer: myReveal,
+                partner_answer: partnerReveal,
+              });
+              setRevealed(true);
+              revealedRef.current = true;
+              if (myReveal?.choice === partnerReveal?.choice) {
+                soundEffects.playMatch();
+              } else {
+                soundEffects.playPop();
+              }
             }
           }
         }
       } catch (err) {
         // Silent polling fallback
       }
-    }, 1500);
+    }, 1200);
 
     return () => clearInterval(poll);
-  }, [sessionId, currentLevel, revealed, lockedAnswer, session?.current_level, gameKey, navigate]);
+  }, [sessionId, user?.id, gameKey, navigate, resetForNewLevel]);
 
   // ── Helper to broadcast sync events safely ───────────────────────────────────
   const broadcastSync = (event, payload = {}) => {
@@ -323,114 +348,138 @@ export default function GameScreen() {
 
   // ── Submit answer (This or That / Know Me) ───────────────────────────────────
   const handleLockAnswer = async () => {
-    if (!selectedOption || lockedAnswer || submitting) return;
+    if (!selectedOption || lockedAnswerRef.current || submittingRef.current) return;
+
+    // 1. Build text label for the selected option
+    let text = '';
+    if (gameKey === 'this_or_that') {
+      text = selectedOption === 'A' ? question.optionA : question.optionB;
+    } else if (gameKey === 'know_me') {
+      const map = { A: question.optionA, B: question.optionB, C: question.optionC, D: question.optionD };
+      text = map[selectedOption] || selectedOption;
+    }
+
+    const myAnswer = { choice: selectedOption, text };
+
+    // 2. Optimistically lock immediately so UI locks instantly and cannot be wiped
+    setLockedAnswer(myAnswer);
+    lockedAnswerRef.current = myAnswer;
     setSubmitting(true);
+    submittingRef.current = true;
     setErrorMsg('');
+    soundEffects.playLock();
+
     try {
-      // Build text label for the selected option
-      let text = '';
-      if (gameKey === 'this_or_that') {
-        text = selectedOption === 'A' ? question.optionA : question.optionB;
-      } else if (gameKey === 'know_me') {
-        const map = { A: question.optionA, B: question.optionB, C: question.optionC, D: question.optionD };
-        text = map[selectedOption] || selectedOption;
-      }
+      const activeLvl = currentLevelRef.current;
+      const res = await sessionService.submitAnswer(sessionId, activeLvl, myAnswer);
 
-      const res = await sessionService.submitAnswer(sessionId, currentLevel, {
-        choice: selectedOption,
-        text,
-      });
-
-      soundEffects.playLock();
-      const myAnswer = { choice: selectedOption, text };
-      setLockedAnswer(myAnswer);
-
-      if (res.both_answered) {
-        // RPC returns partner_1_answer / partner_2_answer (by DB partner order)
-        // Map to my_answer / partner_answer by checking which one matches our submission
+      if (res?.both_answered) {
+        // Both answered! Determine partner's answer (whichever does not match myAnswer)
         const p1 = res.partner_1_answer;
         const p2 = res.partner_2_answer;
-        const isP1 = session?.partner_1_id === user?.id;
-        const myRevealAnswer = isP1 ? p1 : p2;
-        const partnerRevealAnswer = isP1 ? p2 : p1;
+        const partnerAns = (p1?.choice === myAnswer.choice ? p2 : p1) || p2 || p1;
 
-        setRevealData({ my_answer: myRevealAnswer, partner_answer: partnerRevealAnswer });
+        setRevealData({ my_answer: myAnswer, partner_answer: partnerAns });
         setRevealed(true);
-        if (myRevealAnswer?.choice === partnerRevealAnswer?.choice) {
+        revealedRef.current = true;
+
+        if (myAnswer.choice === partnerAns?.choice) {
           soundEffects.playMatch();
         } else {
           soundEffects.playPop();
         }
 
         // Instant broadcast simultaneous reveal to partner
-        // NOTE: We send OUR perspective; receiver flips my/partner
         broadcastSync('reveal_answers', {
-          level: currentLevel,
-          my_answer: myRevealAnswer,
-          partner_answer: partnerRevealAnswer,
+          level: activeLvl,
+          sender_choice: myAnswer,
+          receiver_choice: partnerAns,
         });
       } else {
         // Broadcast that this partner locked their answer
         broadcastSync('answer_locked', {
-          level: currentLevel,
+          level: activeLvl,
           userId: user?.id,
         });
       }
     } catch (err) {
-      console.error(err);
-      setErrorMsg(err.message || 'Could not submit answer.');
+      console.error('Submit error:', err);
+      // Even if broadcast failed or network blipped, recheck if both answered
+      const check = await sessionService.checkRevealStatus(sessionId, currentLevelRef.current);
+      if (check?.both_answered && check.answers) {
+        const myReveal = check.answers.find((a) => a.user_id === user?.id)?.answer || myAnswer;
+        const partnerReveal = check.answers.find((a) => a.user_id !== user?.id)?.answer;
+        if (myReveal && partnerReveal) {
+          setRevealData({ my_answer: myReveal, partner_answer: partnerReveal });
+          setRevealed(true);
+          revealedRef.current = true;
+        }
+      } else {
+        setErrorMsg(err.message || 'Could not submit answer.');
+      }
     } finally {
       setSubmitting(false);
+      submittingRef.current = false;
     }
   };
 
   // ── Submit answer (Truth or Dare — after completing the dare/truth) ──────────
   const handleTodDone = async () => {
-    if (lockedAnswer || submitting) return;
+    if (lockedAnswerRef.current || submittingRef.current) return;
+    const chosenType = selectedOption || 'truth';
+    const chosenText = chosenType === 'truth' ? question.truth : question.dare;
+    const myAnswer = { choice: chosenType, text: chosenText };
+
+    // Optimistically lock
+    setLockedAnswer(myAnswer);
+    lockedAnswerRef.current = myAnswer;
     setSubmitting(true);
+    submittingRef.current = true;
     setErrorMsg('');
+    soundEffects.playLock();
+
     try {
-      const chosenType = selectedOption; // 'truth' or 'dare'
-      const chosenText = chosenType === 'truth' ? question.truth : question.dare;
+      const activeLvl = currentLevelRef.current;
+      const res = await sessionService.submitAnswer(sessionId, activeLvl, myAnswer);
 
-      const res = await sessionService.submitAnswer(sessionId, currentLevel, {
-        choice: chosenType,
-        text: chosenText,
-      });
-
-      soundEffects.playLock();
-      const myAnswer = { choice: chosenType, text: chosenText };
-      setLockedAnswer(myAnswer);
-
-      if (res.both_answered) {
+      if (res?.both_answered) {
         const p1 = res.partner_1_answer;
         const p2 = res.partner_2_answer;
-        const isP1 = session?.partner_1_id === user?.id;
-        const myRevealAnswer = isP1 ? p1 : p2;
-        const partnerRevealAnswer = isP1 ? p2 : p1;
+        const partnerAns = (p1?.choice === myAnswer.choice ? p2 : p1) || p2 || p1;
 
-        setRevealData({ my_answer: myRevealAnswer, partner_answer: partnerRevealAnswer });
+        setRevealData({ my_answer: myAnswer, partner_answer: partnerAns });
         setRevealed(true);
+        revealedRef.current = true;
         soundEffects.playMatch();
 
-        // Instant broadcast simultaneous reveal to partner
         broadcastSync('reveal_answers', {
-          level: currentLevel,
-          my_answer: myRevealAnswer,
-          partner_answer: partnerRevealAnswer,
+          level: activeLvl,
+          sender_choice: myAnswer,
+          receiver_choice: partnerAns,
         });
       } else {
-        // Broadcast that this partner completed their turn
         broadcastSync('answer_locked', {
-          level: currentLevel,
+          level: activeLvl,
           userId: user?.id,
         });
       }
     } catch (err) {
-      console.error(err);
-      setErrorMsg(err.message || 'Could not submit answer.');
+      console.error('Submit ToD error:', err);
+      const check = await sessionService.checkRevealStatus(sessionId, currentLevelRef.current);
+      if (check?.both_answered && check.answers) {
+        const myReveal = check.answers.find((a) => a.user_id === user?.id)?.answer || myAnswer;
+        const partnerReveal = check.answers.find((a) => a.user_id !== user?.id)?.answer;
+        if (myReveal && partnerReveal) {
+          setRevealData({ my_answer: myReveal, partner_answer: partnerReveal });
+          setRevealed(true);
+          revealedRef.current = true;
+        }
+      } else {
+        setErrorMsg(err.message || 'Could not submit answer.');
+      }
     } finally {
       setSubmitting(false);
+      submittingRef.current = false;
     }
   };
 
@@ -441,20 +490,14 @@ export default function GameScreen() {
     setErrorMsg('');
     try {
       const res = await sessionService.advanceLevel(sessionId);
-      if (res.status === 'completed' || currentLevel >= 60) {
+      if (res.status === 'completed' || currentLevelRef.current >= 60) {
         soundEffects.playCelebrate();
         broadcastSync('game_completed', { sessionId, gameKey });
         navigate(`/results?session=${sessionId}&game=${gameKey}`);
       } else {
         soundEffects.playPop();
-        const nextLevel = res.current_level || (session?.current_level || currentLevel) + 1;
-        setSelectedOption(null);
-        setLockedAnswer(null);
-        setRevealed(false);
-        setRevealData(null);
-        setTodPhase('pick');
-        setSession((prev) => (prev ? { ...prev, current_level: nextLevel } : { current_level: nextLevel }));
-
+        const nextLevel = res.current_level || currentLevelRef.current + 1;
+        resetForNewLevel(nextLevel);
         // Instant broadcast advance to partner device
         broadcastSync('level_advanced', { newLevel: nextLevel });
       }
@@ -462,14 +505,9 @@ export default function GameScreen() {
       console.error(err);
       try {
         const sess = await sessionService.getSession(sessionId);
-        if (sess && sess.current_level > currentLevel) {
+        if (sess && sess.current_level > currentLevelRef.current) {
           soundEffects.playPop();
-          setSelectedOption(null);
-          setLockedAnswer(null);
-          setRevealed(false);
-          setRevealData(null);
-          setTodPhase('pick');
-          setSession(sess);
+          resetForNewLevel(sess.current_level, sess);
           return;
         }
       } catch (_) {}

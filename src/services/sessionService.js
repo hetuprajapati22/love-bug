@@ -79,17 +79,13 @@ export const sessionService = {
   async submitAnswer(sessionId, levelNumber, answer) {
     if (!supabase) throw new Error('Supabase client not initialized');
 
-    // Fetch latest session to ensure we are submitting for the authoritative level
-    const sess = await this.getSession(sessionId);
-    const targetLevel = sess?.current_level || levelNumber;
-
     const { data, error } = await supabase.rpc('submit_level_answer', {
       p_session_id: sessionId,
-      p_level_number: targetLevel,
+      p_level_number: levelNumber,
       p_answer: answer,
     });
     if (error) throw error;
-    return { ...data, current_level: targetLevel };
+    return { ...data, current_level: levelNumber };
   },
 
   /**
