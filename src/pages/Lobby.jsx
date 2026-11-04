@@ -43,10 +43,19 @@ export default function Lobby() {
 
       // If already active, prepare to start
       if (data.status === 'active') {
+        try {
+          if (supabase && data.session_id) {
+            supabase.channel(`lobby_sync_${data.session_id}`).send({
+              type: 'broadcast',
+              event: 'lobby_start',
+            });
+          }
+        } catch (_) {}
+
         setStarting(true);
         setTimeout(() => {
           navigate(`/play?session=${data.session_id}&game=${gameType}`);
-        }, 1200);
+        }, 800);
       }
     } catch (err) {
       console.error('Failed to initialize lobby:', err);
@@ -60,10 +69,25 @@ export default function Lobby() {
     initLobby();
   }, [initLobby]);
 
-  // Real-time listener for the session
+  // Real-time listener & Broadcast for the session
   useEffect(() => {
     if (!session?.session_id) return;
 
+    // 1. Instant WebSocket Broadcast for Lobby Start
+    const broadcastChannel = supabase.channel(`lobby_sync_${session.session_id}`, {
+      config: { broadcast: { self: false } },
+    });
+
+    broadcastChannel
+      .on('broadcast', { event: 'lobby_start' }, () => {
+        setStarting(true);
+        setTimeout(() => {
+          navigate(`/play?session=${session.session_id}&game=${gameType}`);
+        }, 800);
+      })
+      .subscribe();
+
+    // 2. Postgres changes fallback
     const channel = supabase
       .channel(`session_${session.session_id}`)
       .on(
@@ -89,16 +113,42 @@ export default function Lobby() {
             setStarting(true);
             setTimeout(() => {
               navigate(`/play?session=${updated.id}&game=${gameType}`);
-            }, 1200);
+            }, 800);
           }
         }
       )
       .subscribe();
 
+    // 3. Heartbeat polling check (1.5s interval to ensure both devices launch seamlessly)
+    const pollInterval = setInterval(async () => {
+      if (starting) return;
+      try {
+        const sess = await sessionService.getSession(session.session_id);
+        if (sess) {
+          if (sess.status === 'active' || (sess.partner_1_ready && sess.partner_2_ready)) {
+            setStarting(true);
+            setTimeout(() => {
+              navigate(`/play?session=${sess.id}&game=${gameType}`);
+            }, 800);
+          } else {
+            setSession((prev) => ({
+              ...prev,
+              partner_1_ready: sess.partner_1_ready,
+              partner_2_ready: sess.partner_2_ready,
+            }));
+          }
+        }
+      } catch (e) {
+        // Silent polling
+      }
+    }, 1500);
+
     return () => {
+      clearInterval(pollInterval);
+      supabase.removeChannel(broadcastChannel);
       supabase.removeChannel(channel);
     };
-  }, [session?.session_id, navigate]);
+  }, [session?.session_id, starting, gameType, navigate]);
 
   const handleLeaveLobby = async () => {
     if (session?.session_id) {

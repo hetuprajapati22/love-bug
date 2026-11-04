@@ -5,10 +5,34 @@ import { useAuth } from '../../hooks/useAuth';
 import { supabase } from '../../lib/supabaseClient';
 import { soundEffects } from '../../utils/soundEffects';
 
+const STORAGE_KEY_PREFIX = 'lovebug_couple_chat_';
+const TWENTY_FOUR_HOURS_MS = 24 * 60 * 60 * 1000; // 24-hour retention window
+
+/**
+ * Helper to read unexpired chat messages (persisted for 24 hours)
+ */
+const getValidChatMessages = (cid) => {
+  if (!cid) return [];
+  try {
+    const raw = localStorage.getItem(`${STORAGE_KEY_PREFIX}${cid}`);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    const now = Date.now();
+    // Filter out messages older than 24 hours
+    return parsed.filter((m) => {
+      const time = m.createdAt || Number(String(m.id).split('_')[0]) || 0;
+      return now - time < TWENTY_FOUR_HOURS_MS;
+    });
+  } catch {
+    return [];
+  }
+};
+
 /**
  * CoupleChat Component
  * Dual-tab Realtime Couple Hub:
- * 1. Live Partner Chat (Instant Supabase Broadcast sync between both partners)
+ * 1. Live Partner Chat (Instant Supabase Broadcast sync between both partners + 24-Hour Persistence)
  * 2. Love Bug AI Assistant (Romantic advice, date ideas & prompts)
  */
 export default function CoupleChat() {
@@ -17,15 +41,37 @@ export default function CoupleChat() {
   const [activeTab, setActiveTab] = useState('partner'); // 'partner' | 'lovebug'
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Partner chat messages
+  const myPetName = profile?.pet_name || 'You';
+  const partnerPetName = couple?.partner_pet_name || 'Partner';
+  // Note: get_my_couple_data returns 'couple_id'
+  const coupleId = couple?.couple_id || couple?.id || (user ? `couple_${user.id}` : null);
+
+  // Partner chat messages (persisted for 24 hours across refreshes)
   const [partnerMessages, setPartnerMessages] = useState(() => {
-    try {
-      const saved = localStorage.getItem(`couple_chat_${couple?.id}`);
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
+    return coupleId ? getValidChatMessages(coupleId) : [];
   });
+
+  // When coupleId resolves or updates, load saved 24-hr history
+  useEffect(() => {
+    if (coupleId) {
+      const saved = getValidChatMessages(coupleId);
+      if (saved.length > 0) {
+        setPartnerMessages(saved);
+      }
+    }
+  }, [coupleId]);
+
+  // Persist partner messages to localStorage with 24-hour expiration
+  useEffect(() => {
+    if (coupleId && partnerMessages.length > 0) {
+      const now = Date.now();
+      const valid = partnerMessages.filter((m) => {
+        const time = m.createdAt || Number(String(m.id).split('_')[0]) || 0;
+        return now - time < TWENTY_FOUR_HOURS_MS;
+      });
+      localStorage.setItem(`${STORAGE_KEY_PREFIX}${coupleId}`, JSON.stringify(valid.slice(-100)));
+    }
+  }, [partnerMessages, coupleId]);
 
   // LoveBug AI messages
   const [aiMessages, setAiMessages] = useState([
@@ -40,19 +86,7 @@ export default function CoupleChat() {
   const [isAiTyping, setIsAiTyping] = useState(false);
   const messagesEndRef = useRef(null);
 
-  const myPetName = profile?.pet_name || 'You';
-  const partnerPetName = couple?.partner_pet_name || 'Partner';
-  // Note: get_my_couple_data returns 'couple_id'
-  const coupleId = couple?.couple_id || couple?.id || (user ? `couple_${user.id}` : 'demo_chat');
-
   const channelRef = useRef(null);
-
-  // Persist partner messages locally
-  useEffect(() => {
-    if (coupleId && partnerMessages.length > 0) {
-      localStorage.setItem(`couple_chat_${coupleId}`, JSON.stringify(partnerMessages.slice(-50)));
-    }
-  }, [partnerMessages, coupleId]);
 
   // Real-time Supabase Broadcast channel for Instant Partner Chat
   useEffect(() => {
@@ -64,7 +98,14 @@ export default function CoupleChat() {
 
     channel
       .on('broadcast', { event: 'new_message' }, ({ payload }) => {
-        setPartnerMessages((prev) => [...prev, payload]);
+        const incoming = {
+          ...payload,
+          createdAt: payload.createdAt || Date.now(),
+        };
+        setPartnerMessages((prev) => {
+          if (prev.some((m) => m.id === incoming.id)) return prev;
+          return [...prev, incoming];
+        });
         soundEffects.playMessage();
         if (!isOpen) {
           setUnreadCount((c) => c + 1);
@@ -96,12 +137,14 @@ export default function CoupleChat() {
 
     soundEffects.playPop();
 
+    const now = Date.now();
     const newMsg = {
-      id: `${Date.now()}_${user?.id || 'me'}`,
+      id: `${now}_${user?.id || 'me'}`,
       senderId: user?.id,
       senderName: myPetName,
       text,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      createdAt: now,
     };
 
     setPartnerMessages((prev) => [...prev, newMsg]);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { sessionService } from '../services/sessionService';
@@ -95,6 +95,9 @@ export default function GameScreen() {
   const myPetName = profile?.pet_name || 'You';
   const partnerPetName = couple?.partner_pet_name || 'Partner';
 
+  // ── Broadcast Channel Reference ────────────────────────────────────────────
+  const syncChannelRef = useRef(null);
+
   // ── Load session + existing answer ──────────────────────────────────────────
   const loadSessionState = useCallback(async () => {
     if (!sessionId) {
@@ -138,38 +141,168 @@ export default function GameScreen() {
 
   useEffect(() => { loadSessionState(); }, [loadSessionState]);
 
-  // ── Real-time listeners ──────────────────────────────────────────────────────
+  // ── Instant Supabase Broadcast Sync + Postgres Changes ──────────────────────
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId || !supabase) return;
 
-    const answersChannel = supabase
-      .channel(`answers_${sessionId}`)
-      .on('postgres_changes', {
-        event: 'INSERT', schema: 'public',
-        table: 'session_answers', filter: `session_id=eq.${sessionId}`,
-      }, async () => { await loadSessionState(); })
-      .subscribe();
+    // 1. Instant WebSocket Broadcast Channel (< 50ms sync between partners)
+    const syncChannel = supabase.channel(`game_sync_${sessionId}`, {
+      config: { broadcast: { self: false } },
+    });
 
-    const sessionChannel = supabase
-      .channel(`game_${sessionId}`)
-      .on('postgres_changes', {
-        event: 'UPDATE', schema: 'public',
-        table: 'game_sessions', filter: `id=eq.${sessionId}`,
-      }, (payload) => {
-        setSession(payload.new);
+    syncChannel
+      .on('broadcast', { event: 'reveal_answers' }, ({ payload }) => {
+        // Partner answered second, revealing both simultaneously!
+        setRevealData({
+          partner_1_answer: payload.partner_1_answer,
+          partner_2_answer: payload.partner_2_answer,
+        });
+        setRevealed(true);
+        if (payload.partner_1_answer?.choice === payload.partner_2_answer?.choice) {
+          soundEffects.playMatch();
+        } else {
+          soundEffects.playPop();
+        }
+      })
+      .on('broadcast', { event: 'answer_locked' }, () => {
+        // Partner locked their answer, recheck state
+        loadSessionState();
+      })
+      .on('broadcast', { event: 'level_advanced' }, async (payload) => {
+        // Partner pressed "Next Question", advance both immediately!
+        soundEffects.playPop();
         setSelectedOption(null);
         setLockedAnswer(null);
         setRevealed(false);
         setRevealData(null);
         setTodPhase('pick');
+        setSession((prev) => (prev ? { ...prev, current_level: payload.newLevel } : prev));
+        await loadSessionState();
       })
+      .on('broadcast', { event: 'game_completed' }, () => {
+        soundEffects.playCelebrate();
+        navigate(`/results?session=${sessionId}&game=${gameKey}`);
+      })
+      .subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+          syncChannelRef.current = syncChannel;
+        }
+      });
+
+    // 2. Database postgres_changes listeners (Replication backup)
+    const answersChannel = supabase
+      .channel(`answers_${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'session_answers',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        async () => {
+          await loadSessionState();
+        }
+      )
+      .subscribe();
+
+    const sessionChannel = supabase
+      .channel(`game_db_${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'game_sessions',
+          filter: `id=eq.${sessionId}`,
+        },
+        (payload) => {
+          const updated = payload.new;
+          setSession(updated);
+          if (updated.status === 'completed') {
+            navigate(`/results?session=${sessionId}&game=${gameKey}`);
+          } else {
+            setSelectedOption(null);
+            setLockedAnswer(null);
+            setRevealed(false);
+            setRevealData(null);
+            setTodPhase('pick');
+          }
+        }
+      )
       .subscribe();
 
     return () => {
+      supabase.removeChannel(syncChannel);
       supabase.removeChannel(answersChannel);
       supabase.removeChannel(sessionChannel);
+      syncChannelRef.current = null;
     };
-  }, [sessionId, loadSessionState]);
+  }, [sessionId, loadSessionState, gameKey, navigate]);
+
+  // ── Heartbeat Polling Fallback (Guarantees zero stuck partners even on laggy 4G) ──
+  useEffect(() => {
+    if (!sessionId || revealed) return;
+
+    const poll = setInterval(async () => {
+      try {
+        // Check if both answers have arrived in DB
+        const answers = await sessionService.getLevelAnswers(sessionId, currentLevel);
+        if (answers.length >= 2) {
+          const p1Ans = answers.find((a) => a.user_id === session?.partner_1_id);
+          const p2Ans = answers.find((a) => a.user_id === session?.partner_2_id);
+          setRevealData({ partner_1_answer: p1Ans?.answer, partner_2_answer: p2Ans?.answer });
+          setRevealed(true);
+          if (p1Ans?.answer?.choice === p2Ans?.answer?.choice) {
+            soundEffects.playMatch();
+          } else {
+            soundEffects.playPop();
+          }
+          return;
+        }
+
+        // Check if partner already advanced level in DB
+        const sess = await sessionService.getSession(sessionId);
+        if (sess) {
+          if (sess.current_level > currentLevel) {
+            setSession(sess);
+            setSelectedOption(null);
+            setLockedAnswer(null);
+            setRevealed(false);
+            setRevealData(null);
+            setTodPhase('pick');
+          } else if (sess.status === 'completed') {
+            navigate(`/results?session=${sessionId}&game=${gameKey}`);
+          }
+        }
+      } catch (err) {
+        // Background polling fallback, ignore minor connection ripples
+      }
+    }, 1500);
+
+    return () => clearInterval(poll);
+  }, [sessionId, currentLevel, revealed, session?.partner_1_id, session?.partner_2_id, gameKey, navigate]);
+
+  // ── Helper to broadcast sync events safely ───────────────────────────────────
+  const broadcastSync = (event, payload = {}) => {
+    try {
+      if (syncChannelRef.current) {
+        syncChannelRef.current.send({
+          type: 'broadcast',
+          event,
+          payload,
+        });
+      } else if (supabase && sessionId) {
+        supabase.channel(`game_sync_${sessionId}`).send({
+          type: 'broadcast',
+          event,
+          payload,
+        });
+      }
+    } catch (e) {
+      console.warn('Broadcast send error:', e);
+    }
+  };
 
   // ── Submit answer (This or That / Know Me) ───────────────────────────────────
   const handleLockAnswer = async () => {
@@ -202,6 +335,19 @@ export default function GameScreen() {
         } else {
           soundEffects.playPop();
         }
+
+        // Instant broadcast simultaneous reveal to partner
+        broadcastSync('reveal_answers', {
+          level: currentLevel,
+          partner_1_answer: res.partner_1_answer,
+          partner_2_answer: res.partner_2_answer,
+        });
+      } else {
+        // Broadcast that this partner locked their answer
+        broadcastSync('answer_locked', {
+          level: currentLevel,
+          userId: user?.id,
+        });
       }
     } catch (err) {
       console.error(err);
@@ -232,6 +378,19 @@ export default function GameScreen() {
         setRevealData({ partner_1_answer: res.partner_1_answer, partner_2_answer: res.partner_2_answer });
         setRevealed(true);
         soundEffects.playMatch();
+
+        // Instant broadcast simultaneous reveal to partner
+        broadcastSync('reveal_answers', {
+          level: currentLevel,
+          partner_1_answer: res.partner_1_answer,
+          partner_2_answer: res.partner_2_answer,
+        });
+      } else {
+        // Broadcast that this partner completed their turn
+        broadcastSync('answer_locked', {
+          level: currentLevel,
+          userId: user?.id,
+        });
       }
     } catch (err) {
       console.error(err);
@@ -250,14 +409,20 @@ export default function GameScreen() {
       const res = await sessionService.advanceLevel(sessionId);
       if (res.status === 'completed' || currentLevel >= 60) {
         soundEffects.playCelebrate();
+        broadcastSync('game_completed', { sessionId, gameKey });
         navigate(`/results?session=${sessionId}&game=${gameKey}`);
       } else {
         soundEffects.playPop();
+        const nextLevel = (session?.current_level || currentLevel) + 1;
         setSelectedOption(null);
         setLockedAnswer(null);
         setRevealed(false);
         setRevealData(null);
         setTodPhase('pick');
+        setSession((prev) => (prev ? { ...prev, current_level: nextLevel } : prev));
+
+        // Instant broadcast advance to partner device
+        broadcastSync('level_advanced', { newLevel: nextLevel });
       }
     } catch (err) {
       console.error(err);

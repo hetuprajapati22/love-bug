@@ -1,56 +1,68 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 
 /**
  * FloatingHearts Component
- * Renders dreamy, natural floating pastel hearts, blossoms, and twinkling stars.
- * Includes soft ambient pastel glow orbs that drift gently in the background.
+ * Optimized, silky-smooth romantic floating pastel hearts, blossoms, and sparkles.
+ * Uses GPU-accelerated transforms and lightweight particle counts for zero lag on mobile.
  */
-export default function FloatingHearts({ count = 22 }) {
+export default function FloatingHearts({ count: propCount }) {
+  // Mobile detection for silky-smooth 60fps rendering without CPU/GPU throttle
+  const [isMobile, setIsMobile] = useState(() => {
+    return typeof window !== 'undefined' ? window.innerWidth < 640 : false;
+  });
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640);
+    };
+    window.addEventListener('resize', handleResize, { passive: true });
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const count = propCount || (isMobile ? 8 : 14);
+
   const items = useMemo(() => {
-    const symbols = ['💗', '✨', '🌸', '💖', '✦', '🤍', '✧', '💕'];
+    const symbols = ['💗', '✨', '🌸', '💖', '🤍', '💕'];
     return Array.from({ length: count }, (_, i) => ({
       id: i,
       symbol: symbols[i % symbols.length],
-      left: `${(i * 100) / count + (Math.random() * 5 - 2.5)}%`,
-      size: `${14 + (i % 5) * 5}px`,
-      duration: `${12 + (i % 7) * 3}s`,
-      delay: `${(i * 0.8).toFixed(1)}s`,
-      opacity: 0.35 + (i % 4) * 0.15,
-      blur: i % 4 === 0 ? '1px' : '0px',
+      left: `${(i * 100) / count + (i % 2 === 0 ? 2 : -2)}%`,
+      size: `${14 + (i % 4) * 4}px`,
+      duration: `${14 + (i % 5) * 3}s`,
+      delay: `${(i * 1.1).toFixed(1)}s`,
+      opacity: 0.35 + (i % 3) * 0.15,
     }));
   }, [count]);
 
   return (
     <div className="floating-hearts-layer" aria-hidden="true">
-      {/* Dreamy Ambient Glowing Background Orbs */}
+      {/* Dreamy Ambient Glowing Background Orbs (Static & Hardware Accelerated for Max Smoothness) */}
       <div
         className="ambient-glow-orb"
         style={{
           position: 'absolute',
-          top: '15%',
-          left: '10%',
-          width: '320px',
-          height: '320px',
+          top: '10%',
+          left: '8%',
+          width: isMobile ? '220px' : '320px',
+          height: isMobile ? '220px' : '320px',
           borderRadius: '50%',
           background: 'radial-gradient(circle, rgba(248, 201, 216, 0.45) 0%, rgba(255, 245, 229, 0) 70%)',
-          filter: 'blur(40px)',
-          animation: 'ambientDrift1 16s ease-in-out infinite',
           pointerEvents: 'none',
+          transform: 'translateZ(0)',
         }}
       />
       <div
         className="ambient-glow-orb"
         style={{
           position: 'absolute',
-          bottom: '20%',
-          right: '8%',
-          width: '360px',
-          height: '360px',
+          bottom: '15%',
+          right: '5%',
+          width: isMobile ? '240px' : '360px',
+          height: isMobile ? '240px' : '360px',
           borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(220, 212, 247, 0.45) 0%, rgba(248, 201, 216, 0) 70%)',
-          filter: 'blur(50px)',
-          animation: 'ambientDrift2 18s ease-in-out infinite',
+          background: 'radial-gradient(circle, rgba(220, 212, 247, 0.4) 0%, rgba(248, 201, 216, 0) 70%)',
           pointerEvents: 'none',
+          transform: 'translateZ(0)',
         }}
       />
 
@@ -68,7 +80,8 @@ export default function FloatingHearts({ count = 22 }) {
             animationTimingFunction: 'ease-in-out',
             animationIterationCount: 'infinite',
             opacity: item.opacity,
-            filter: item.blur !== '0px' ? `blur(${item.blur})` : undefined,
+            willChange: 'transform, opacity',
+            transform: 'translate3d(0, 0, 0)',
           }}
         >
           {item.symbol}

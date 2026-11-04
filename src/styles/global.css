@@ -23,17 +23,15 @@ html, body {
   overflow-x: hidden;
 }
 
-/* Moving pastel animated gradient background */
+/* Performant smooth pastel gradient background with fixed attachment (Zero main-thread paint lag) */
 body {
-  background: linear-gradient(135deg, #FFF5E5 0%, #F8C9D8 45%, #DCD4F7 80%, #FFF5E5 100%);
-  background-size: 300% 300%;
-  animation: pastelGradientFlow 18s ease infinite;
+  background: linear-gradient(135deg, #FFF5E5 0%, #FCE8EE 35%, #EDE7FA 70%, #FFF5E5 100%);
+  background-attachment: fixed;
 }
 
 [data-theme='dark'] body {
-  background: linear-gradient(135deg, #1F1420 0%, #30172A 50%, #211529 100%);
-  background-size: 300% 300%;
-  animation: pastelGradientFlow 22s ease infinite;
+  background: linear-gradient(135deg, #1A121B 0%, #291524 50%, #1D1324 100%);
+  background-attachment: fixed;
 }
 
 /* Typography Defaults */
@@ -80,18 +78,29 @@ p {
   z-index: 2;
 }
 
-/* Frosted Glass Card */
+/* Frosted Glass Card (Isolated GPU Layer for Ultra-Smooth Mobile Frame Rate) */
 .glass-card {
   background: var(--color-glass-bg);
-  backdrop-filter: blur(18px);
-  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
   border: 1.5px solid var(--color-glass-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-card);
   padding: var(--space-xl) var(--space-lg);
   position: relative;
   overflow: hidden;
+  transform: translateZ(0);
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
   transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.28s ease;
+}
+
+@media (max-width: 640px) {
+  .glass-card {
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    padding: var(--space-lg) var(--space-md);
+  }
 }
 
 /* Soft internal radial glow & very faint tiny-heart watermark pattern */
@@ -127,6 +136,8 @@ p {
 /* Interactive Card Hover & Tap Effects */
 .interactive-card {
   cursor: pointer;
+  will-change: transform;
+  transform: translateZ(0);
   transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.22s ease, border-color 0.2s ease;
 }
 
